@@ -1,5 +1,4 @@
 import pandas as pd
-import argparse
 
 
 def value_trade_data(input_csv, output_csv, year=None):
@@ -41,8 +40,8 @@ def run_interactive():
         print("Invalid choice. Please run the program again and select either 1 or 2.")
 
     # Ask user for the input & output CSV file paths
-    input_csv = input("Enter the path to the input CSV file: ").strip()
-    output_csv = input("Enter the desired path for the output CSV file: ").strip()
+    input_csv = input("Enter the path to the input CSV file (no quotes!): ").strip()
+    output_csv = input("Enter the desired path for the output CSV file (no quotes!): ").strip()
 
     # Ask if the user wants to filter by a specific year
     year_filter = input("Do you want to filter by a specific year? (yes/no): ").strip().lower()
@@ -56,8 +55,12 @@ def run_interactive():
             print("Invalid year input. The script will process all available years.")
 
     # Process the data
-    # if choice == 1:
-    #     value_trade_data(input_csv, output_csv, year)
+    print("Processing...")
+    if choice == '1':
+        value_trade_data(input_csv, output_csv, year)
+
+    print("Completed. Thank you for using the Trade Data Cleaning Tool.")
+    print("We hope to see you again!")
 
 
 if __name__ == "__main__":
