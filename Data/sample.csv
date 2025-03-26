@@ -1,0 +1,100 @@
+exporter_id,exporter_name,importer_id,importer_name,value
+abw,Aruba,are,United Arab Emirates,405024.0
+abw,Aruba,aut,Austria,26980.0
+afg,Afghanistan,and,Andorra,8013.0
+afg,Afghanistan,are,United Arab Emirates,38606731.0
+afg,Afghanistan,arm,Armenia,81834.0
+afg,Afghanistan,aus,Australia,778370.0
+afg,Afghanistan,aut,Austria,2126821.0
+afg,Afghanistan,aze,Azerbaijan,51700.00000000001
+ago,Angola,are,United Arab Emirates,1586226001.0
+ago,Angola,arm,Armenia,3394126.0
+ago,Angola,aus,Australia,268423.0
+ago,Angola,aut,Austria,82949.0
+ago,Angola,aze,Azerbaijan,1907595.0000000002
+aia,Anguilla,are,United Arab Emirates,133070.0
+aia,Anguilla,arm,Armenia,442895.0
+aia,Anguilla,aus,Australia,69776.0
+aia,Anguilla,aut,Austria,20685.0
+alb,Albania,and,Andorra,154313.0
+alb,Albania,are,United Arab Emirates,49208377.0
+alb,Albania,arm,Armenia,1337032.0
+alb,Albania,aus,Australia,3849187.0
+alb,Albania,aut,Austria,62700414.0
+alb,Albania,aze,Azerbaijan,576881.0
+and,Andorra,ago,Angola,1269.0000000000002
+and,Andorra,alb,Albania,26.0
+and,Andorra,are,United Arab Emirates,6574942.999999999
+and,Andorra,arg,Argentina,125250.0
+and,Andorra,arm,Armenia,40832.0
+and,Andorra,aus,Australia,126519.0
+and,Andorra,aut,Austria,586529.0
+and,Andorra,aze,Azerbaijan,3221.0
+are,United Arab Emirates,abw,Aruba,11276197.0
+are,United Arab Emirates,afg,Afghanistan,1839991206.0
+are,United Arab Emirates,ago,Angola,532658952.0
+are,United Arab Emirates,aia,Anguilla,518737.0
+are,United Arab Emirates,alb,Albania,51033922.0
+are,United Arab Emirates,and,Andorra,85939.0
+are,United Arab Emirates,arg,Argentina,96738140.0
+are,United Arab Emirates,arm,Armenia,418021810.0
+are,United Arab Emirates,asm,American Samoa,187373.0
+are,United Arab Emirates,atg,Antigua and Barbuda,2797289.0
+are,United Arab Emirates,aus,Australia,1153709639.0
+are,United Arab Emirates,aut,Austria,261701401.0
+are,United Arab Emirates,aze,Azerbaijan,721333845.0
+arg,Argentina,alb,Albania,8674197.0
+arg,Argentina,and,Andorra,33428.0
+arg,Argentina,are,United Arab Emirates,356249354.0
+arg,Argentina,arm,Armenia,7944530.0
+arg,Argentina,aus,Australia,502683505.0
+arg,Argentina,aut,Austria,94517024.0
+arg,Argentina,aze,Azerbaijan,55749834.0
+arm,Armenia,alb,Albania,5790.0
+arm,Armenia,and,Andorra,157156.0
+arm,Armenia,are,United Arab Emirates,2254478004.0
+arm,Armenia,arg,Argentina,20599.0
+arm,Armenia,aus,Australia,2138878.0
+arm,Armenia,aut,Austria,10248250.0
+asm,American Samoa,are,United Arab Emirates,1401872.0000000002
+asm,American Samoa,aus,Australia,6085356.0
+asm,American Samoa,aut,Austria,22274.0
+asm,American Samoa,aze,Azerbaijan,23655.0
+atf,French South Antarctic Territory,are,United Arab Emirates,335.0
+atf,French South Antarctic Territory,aus,Australia,8747.0
+atg,Antigua and Barbuda,alb,Albania,8280.0
+atg,Antigua and Barbuda,are,United Arab Emirates,63624.99999999999
+atg,Antigua and Barbuda,aus,Australia,11070288.999999998
+atg,Antigua and Barbuda,aut,Austria,200969.0
+aus,Australia,afg,Afghanistan,35756.0
+aus,Australia,ago,Angola,8219165.0
+aus,Australia,aia,Anguilla,12978.0
+aus,Australia,alb,Albania,2725733.0
+aus,Australia,and,Andorra,117733.0
+aus,Australia,are,United Arab Emirates,3485497013.0
+aus,Australia,arg,Argentina,292706391.0
+aus,Australia,arm,Armenia,2993005.0
+aus,Australia,asm,American Samoa,8987417.0
+aus,Australia,atg,Antigua and Barbuda,506032.0
+aus,Australia,aut,Austria,221411152.0
+aus,Australia,aze,Azerbaijan,12544371.0
+aut,Austria,abw,Aruba,1737475.0
+aut,Austria,afg,Afghanistan,13165626.0
+aut,Austria,ago,Angola,8440069.0
+aut,Austria,aia,Anguilla,6280.0
+aut,Austria,alb,Albania,90544242.0
+aut,Austria,and,Andorra,15799370.000000002
+aut,Austria,are,United Arab Emirates,1147728054.0
+aut,Austria,arg,Argentina,174535120.0
+aut,Austria,arm,Armenia,84789716.0
+aut,Austria,asm,American Samoa,11914.000000000002
+aut,Austria,atg,Antigua and Barbuda,520128.0
+aut,Austria,aus,Australia,1574429718.0
+aut,Austria,aze,Azerbaijan,90565078.0
+aze,Azerbaijan,abw,Aruba,36617.0
+aze,Azerbaijan,afg,Afghanistan,276914.0
+aze,Azerbaijan,ago,Angola,158881.0
+aze,Azerbaijan,alb,Albania,23010907.0
+aze,Azerbaijan,are,United Arab Emirates,125728376.99999999
+aze,Azerbaijan,aus,Australia,29394496.0
+aze,Azerbaijan,aut,Austria,159749614.00000003
