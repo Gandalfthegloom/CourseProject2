@@ -1,3 +1,9 @@
+"""CSC111 Winter 2025: Global Trade Interdependence Visualization
+
+This module serves as the data cleaning program that takes raw data from BACI and processes it for main.py.
+"""
+
+
 import pandas as pd
 
 

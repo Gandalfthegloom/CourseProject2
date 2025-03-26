@@ -6,6 +6,7 @@ It handles the cleaning, filtering, and preparation of data for graph constructi
 
 from typing import Dict, Any, List, Tuple
 import pandas as pd
+import os
 
 
 def load_trade_data(file_path: str) -> pd.DataFrame:
@@ -21,11 +22,26 @@ def load_trade_data(file_path: str) -> pd.DataFrame:
         - file_path refers to a valid CSV file with the expected columns:
           'exporter_id', 'exporter_name', 'importer_id', 'importer_name', 'value'
     """
+    # Check if file exists
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Trade data file not found at: {file_path}")
+    
     # Load the CSV file
-    # Handle any data type conversions or formatting
-    # Verify the data structure
-    # Return the processed DataFrame
-    pass
+    df = pd.read_csv('your_file.csv')
+    
+    # Ensure value column is numeric
+    df['value'] = pd.to_numeric(df['value'], errors='coerce')
+    
+    # Drop rows with NaN values
+    df = df.dropna(subset=['exporter_id', 'importer_id', 'value'])
+    
+    # Convert country IDs to strings
+    df['exporter_id'] = df['exporter_id'].astype(str)
+    df['importer_id'] = df['importer_id'].astype(str)
+    
+    print(f"Successfully loaded trade data: {len(df)} trade relationships")
+    
+    return df
 
 
 def get_country_coordinates() -> Dict[str, Tuple[float, float]]:
