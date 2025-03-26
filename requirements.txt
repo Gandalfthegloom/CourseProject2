@@ -1,0 +1,17 @@
+# CSC111 Project 2: Global Trade Interdependence Visualization
+# Required packages
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.25.0
+
+# Graph operations
+networkx>=3.1
+
+# Visualization
+plotly>=5.22.0
+dash>=2.13.0
+
+# Testing and code checking
+python-ta~=2.9.1
+pytest>=7.4.0

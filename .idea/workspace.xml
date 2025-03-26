@@ -6,7 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="04e238cc-7f08-4dda-8b5e-0bc4c83e4841" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Data/trade_i_baci_a_22(bilateral_value_clean).csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cleaner.py" beforeDir="false" afterPath="$PROJECT_DIR$/cleaner.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
