@@ -1,7 +1,7 @@
 """CSC111 Project 2: Global Trade Interdependence - Visualization
 
 This module contains functions for creating interactive visualizations of the trade network.
-It uses Plotly to generate an interactive world map with trade flows and country statistics.
+It uses Plotly and Dash to generate an interactive dashboard with multiple visualization options.
 """
 
 from typing import Dict, List, Tuple, Any, Optional
@@ -9,12 +9,9 @@ import networkx as nx
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-
-from typing import Dict, List, Tuple, Any, Optional
-import networkx as nx
-import plotly.graph_objects as go
-import pandas as pd
-import numpy as np
+import dash
+from dash import dcc, html, Input, Output, callback
+from dash.dependencies import Input, Output
 
 
 def create_trade_visualization(
@@ -53,7 +50,7 @@ def create_trade_visualization(
 
             # Calculate node size based on total trade volume
             total_trade = data['total_exports'] + data['total_imports']
-            node_size = np.log1p(total_trade) * 2  # Log scale to handle wide range of values
+            node_size = 7 + (total_trade / 1e9) ** 0.49   # Log scale to handle wide range of values
 
             # Calculate node color based on trade balance
             trade_balance = data['total_exports'] - data['total_imports']
@@ -99,18 +96,25 @@ def create_trade_visualization(
     ))
 
     # Add edges (trade flows) for the top trading relationships
-    # To avoid cluttering, we'll only show the top relationships
-    top_edges = []
+    # Create a dictionary to store edges by source country
+    country_edges = {}
     for source, target, data in graph.edges(data=True):
         source_name = graph.nodes[source]['name']
         target_name = graph.nodes[target]['name']
 
         if source_name in country_coord_map and target_name in country_coord_map:
-            top_edges.append((source_name, target_name, data['value']))
+            if source_name not in country_edges:
+                country_edges[source_name] = []
+            country_edges[source_name].append((source_name, target_name, data['value']))
 
-    # Sort edges by value and take top 100
-    top_edges.sort(key=lambda x: x[2], reverse=True)
-    top_edges = top_edges[:100]
+    # Get top 5 trading partners for each country
+    top_edges = []
+    for country, edges in country_edges.items():
+        # Sort edges for this country by value
+        edges.sort(key=lambda x: x[2], reverse=True)
+        # Take top 5 or fewer if less than 5 exist
+        top_country_edges = edges[:5]
+        top_edges.extend(top_country_edges)
 
     # Add arrows for each top trade relationship
     for source_name, target_name, value in top_edges:
@@ -119,7 +123,7 @@ def create_trade_visualization(
             end_lat, end_lon = country_coord_map[target_name]
 
             # Calculate edge weight (line thickness) based on value
-            weight = np.log1p(value) * 0.1
+            weight = 0.15 + (value / 1e9) ** 0.2
 
             # Add the trade flow arrow
             plot_trade_arrow(
@@ -169,7 +173,7 @@ def visualize_country_trade(
     Returns:
         A Plotly Figure object showing the selected country's trade relationships
     """
-    # Create a subgraph containing only the selected country and its partners
+    # Create a base figure
     fig = go.Figure()
 
     country_name = graph.nodes[country_id]['name']
@@ -309,29 +313,118 @@ def visualize_country_trade(
     return fig
 
 
-def create_country_selector(
+def create_choropleth_map(
+        graph: nx.DiGraph,
+        metric: str,
+        country_coords: pd.DataFrame,
+        title: str
+) -> go.Figure:
+    """Create a choropleth map showing a specific trade metric for each country.
+
+    Args:
+        graph: The trade network graph
+        metric: The metric to visualize ('exports', 'imports', 'balance', 'total')
+        country_coords: A DataFrame containing countries and their coordinates
+        title: The title for the visualization
+
+    Returns:
+        A Plotly Figure object containing the choropleth map
+    """
+    # Extract values based on the selected metric
+    countries = []
+    values = []
+    texts = []
+    lats = []
+    lons = []
+
+    # Create a mapping of country names to coordinates
+    country_coord_map = dict(zip(country_coords['country'],
+                                 zip(country_coords['centroid_lat'], country_coords['centroid_lon'])))
+
+    for node_id, data in graph.nodes(data=True):
+        country_name = data['name']
+
+        if country_name in country_coord_map:
+            lat, lon = country_coord_map[country_name]
+
+            # Determine the value based on the selected metric
+            if metric == 'exports':
+                value = data['total_exports']
+                text = f"<b>{country_name}</b><br>Total Exports: ${value:,.2f}"
+            elif metric == 'imports':
+                value = data['total_imports']
+                text = f"<b>{country_name}</b><br>Total Imports: ${value:,.2f}"
+            elif metric == 'balance':
+                value = data['total_exports'] - data['total_imports']
+                text = f"<b>{country_name}</b><br>Trade Balance: ${value:,.2f}"
+            else:  # 'total'
+                value = data['total_exports'] + data['total_imports']
+                text = f"<b>{country_name}</b><br>Total Trade: ${value:,.2f}"
+
+            countries.append(country_name)
+            values.append(value)
+            texts.append(text)
+            lats.append(lat)
+            lons.append(lon)
+
+    # Create a figure with bubbles on a map (alternative to choropleth)
+    fig = go.Figure()
+
+    # Add bubbles for each country
+    fig.add_trace(go.Scattergeo(
+        lon=lons,
+        lat=lats,
+        text=texts,
+        mode='markers',
+        marker=dict(
+            size=np.log1p(np.abs(values)) * 2,  # Size based on value (log scale)
+            color=values,
+            colorscale='RdYlGn' if metric == 'balance' else 'Viridis',
+            colorbar=dict(title=f"{metric.capitalize()} (USD)"),
+            cmin=min(values) if min(values) < 0 else None,
+            cmax=max(values),
+            line=dict(width=1, color='black')
+        ),
+        hoverinfo='text',
+        name=f'{metric.capitalize()} by Country'
+    ))
+
+    # Configure the layout
+    fig.update_layout(
+        title=title,
+        geo=dict(
+            projection_type='natural earth',
+            showland=True,
+            landcolor='rgb(243, 243, 243)',
+            showcountries=True,
+            countrycolor='rgb(204, 204, 204)',
+            showocean=True,
+            oceancolor='rgb(230, 250, 255)',
+            showlakes=True,
+            lakecolor='rgb(220, 240, 255)'
+        ),
+        height=800,
+        margin=dict(l=0, r=0, t=50, b=0)
+    )
+
+    return fig
+
+
+def create_dashboard(
         graph: nx.DiGraph,
         country_coords: pd.DataFrame,
         analysis_results: Dict[str, Any]
 ) -> None:
-    """Create an interactive dashboard with country selection dropdown.
+    """Create an integrated dashboard with multiple visualization options.
 
-    This function creates and runs a Dash application that allows users to select
-    a country and view its trade relationships.
+    This function creates and runs a Dash application that allows users to switch
+    between different visualization types and interact with the data.
 
     Args:
         graph: The trade network graph
         country_coords: A DataFrame containing countries and their coordinates
         analysis_results: The dictionary of analysis results from the analysis module
     """
-    try:
-        import dash
-        from dash import dcc, html
-        from dash.dependencies import Input, Output
-    except ImportError:
-        print("Dash is required for the interactive dashboard. Install with: pip install dash")
-        return
-
     # Create a list of countries for the dropdown
     countries = [(node_id, data['name']) for node_id, data in graph.nodes(data=True)]
     countries.sort(key=lambda x: x[1])  # Sort by country name
@@ -339,8 +432,26 @@ def create_country_selector(
     # Create a Dash application
     app = dash.Dash(__name__, title="Global Trade Network Explorer")
 
+    # Define app layout
     app.layout = html.Div([
-        html.H1("Global Trade Network Explorer"),
+        html.H1("Global Trade Network Explorer", style={'textAlign': 'center', 'margin': '20px 0'}),
+
+        # Visualization selector
+        html.Div([
+            html.Label("Select Visualization Type:"),
+            dcc.RadioItems(
+                id='viz-type-selector',
+                options=[
+                    {'label': 'Global Trade Network', 'value': 'global'},
+                    {'label': 'Country Trade Detail', 'value': 'country'},
+                    {'label': 'Trade Metrics Map', 'value': 'metrics'}
+                ],
+                value='global',
+                style={'margin': '10px 0'}
+            )
+        ], style={'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}),
+
+        # Country selector (shown only for country view)
         html.Div([
             html.Label("Select a Country:"),
             dcc.Dropdown(
@@ -348,20 +459,71 @@ def create_country_selector(
                 options=[{'label': name, 'value': id_} for id_, name in countries],
                 value=countries[0][0]  # Default to first country
             )
-        ]),
-        dcc.Graph(id='trade-graph')
+        ], id='country-selector', style={'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}),
+
+        # Metric selector (shown only for metrics view)
+        html.Div([
+            html.Label("Select Trade Metric:"),
+            dcc.RadioItems(
+                id='metric-selector',
+                options=[
+                    {'label': 'Total Exports', 'value': 'exports'},
+                    {'label': 'Total Imports', 'value': 'imports'},
+                    {'label': 'Trade Balance', 'value': 'balance'},
+                    {'label': 'Total Trade Volume', 'value': 'total'}
+                ],
+                value='exports',
+                style={'margin': '10px 0'}
+            )
+        ], id='metrics-selector', style={'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}),
+
+        # The graph
+        dcc.Graph(id='trade-graph', style={'height': '800px'})
     ])
 
+    # Show/hide selectors based on visualization type
+    @app.callback(
+        [Output('country-selector', 'style'),
+         Output('metrics-selector', 'style')],
+        [Input('viz-type-selector', 'value')]
+    )
+    def toggle_selectors(viz_type):
+        country_style = {'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}
+        metrics_style = {'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}
+
+        if viz_type == 'country':
+            metrics_style['display'] = 'none'
+        elif viz_type == 'metrics':
+            country_style['display'] = 'none'
+        else:  # global
+            country_style['display'] = 'none'
+            metrics_style['display'] = 'none'
+
+        return country_style, metrics_style
+
+    # Update the graph based on selections
     @app.callback(
         Output('trade-graph', 'figure'),
-        [Input('country-dropdown', 'value')]
+        [Input('viz-type-selector', 'value'),
+         Input('country-dropdown', 'value'),
+         Input('metric-selector', 'value')]
     )
-    def update_graph(selected_country):
-        # Create a visualization for the selected country
-        return visualize_country_trade(graph, selected_country, country_coords, analysis_results)
+    def update_graph(viz_type, selected_country, selected_metric):
+        if viz_type == 'global':
+            return create_trade_visualization(graph, country_coords, analysis_results)
+        elif viz_type == 'country':
+            return visualize_country_trade(graph, selected_country, country_coords, analysis_results)
+        elif viz_type == 'metrics':
+            titles = {
+                'exports': 'Global Export Volume by Country',
+                'imports': 'Global Import Volume by Country',
+                'balance': 'Trade Balance by Country',
+                'total': 'Total Trade Volume by Country'
+            }
+            return create_choropleth_map(graph, selected_metric, country_coords, titles[selected_metric])
 
     print("Starting dashboard. Navigate to http://127.0.0.1:8050/ to view the application.")
-    app.run_server(debug=True)
+    app.run(debug=True)
 
 
 def plot_trade_arrow(
@@ -440,94 +602,14 @@ def plot_trade_arrow(
     ))
 
 
-def create_choropleth_map(
-        graph: nx.DiGraph,
-        metric: str,
-        analysis_results: Dict[str, Any],
-        title: str
-) -> go.Figure:
-    """Create a choropleth map showing a specific trade metric for each country.
-
-    Args:
-        graph: The trade network graph
-        metric: The metric to visualize ('exports', 'imports', 'balance', etc.)
-        analysis_results: The dictionary of analysis results from the analysis module
-        title: The title for the visualization
-
-    Returns:
-        A Plotly Figure object containing the choropleth map
-    """
-    # Create a dictionary to map ISO country codes to values
-    values = {}
-
-    # ISO country code mapping (partial, extend as needed)
-    # In a real application, you would use a complete ISO code mapping
-    # This is just a simplified example
-    iso_codes = {
-        'United States': 'USA',
-        'China': 'CHN',
-        'Japan': 'JPN',
-        'Germany': 'DEU',
-        'United Kingdom': 'GBR',
-        'France': 'FRA',
-        'Canada': 'CAN',
-        'Australia': 'AUS',
-        'Brazil': 'BRA',
-        'India': 'IND',
-        # Add more mappings as needed
-    }
-
-    # Prepare the data based on the metric
-    for node_id, data in graph.nodes(data=True):
-        country_name = data['name']
-
-        if country_name in iso_codes:
-            if metric == 'exports':
-                values[iso_codes[country_name]] = data['total_exports']
-            elif metric == 'imports':
-                values[iso_codes[country_name]] = data['total_imports']
-            elif metric == 'balance':
-                values[iso_codes[country_name]] = data['total_exports'] - data['total_imports']
-            elif metric == 'total':
-                values[iso_codes[country_name]] = data['total_exports'] + data['total_imports']
-
-    # Create the choropleth map
-    fig = go.Figure(data=go.Choropleth(
-        locations=list(values.keys()),
-        z=list(values.values()),
-        text=[f"{code}: ${value:,.2f}" for code, value in values.items()],
-        colorscale='Viridis',
-        autocolorscale=False,
-        colorbar_title=f"{metric.capitalize()} (USD)",
-        marker_line_color='white',
-        marker_line_width=0.5,
-    ))
-
-    # Configure the layout
-    fig.update_layout(
-        title=title,
-        geo=dict(
-            showframe=False,
-            showcoastlines=True,
-            projection_type='natural earth'
-        ),
-        height=600,
-        margin=dict(l=0, r=0, t=50, b=0)
-    )
-
-    return fig
-
-
 if __name__ == '__main__':
     import doctest
-
     doctest.testmod()
 
     import python_ta
-
     python_ta.check_all(config={
         'extra-imports': ['pandas', 'networkx', 'plotly.graph_objects', 'typing', 'numpy', 'dash'],
-        'allowed-io': [],
+        'allowed-io': ['create_dashboard'],
         'max-line-length': 100,
         'disable': ['R1705', 'C0200']
     })

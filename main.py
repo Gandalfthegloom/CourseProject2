@@ -7,57 +7,71 @@ analysis, and visualization to create an interactive representation of global tr
 """
 
 import pandas as pd
-# import networkx as nx  # Not used now since we use our custom Graph class
 import plotly.graph_objects as go
 
 import data_processing
-import graph_builder  # This module now provides our Graph class and build_trade_graph function
+import graph_builder
 import visualization
 import analysis
-from geodata_check import find_missing_geographic_data
 
 
-def run_trade_visualization() -> None:
-    """Run the complete trade visualization pipeline.
+def run_trade_dashboard() -> None:
+    """Run the complete trade visualization dashboard.
 
     This function orchestrates the following steps:
     1. Load and process the trade data
     2. Build the trade network graph
     3. Perform network analysis
-    4. Create and display the interactive visualization
+    4. Launch the integrated dashboard with multiple visualization options
     """
     # Step 1: Load and process the trade data
     print("Loading and processing trade data...")
     trade_data = data_processing.load_trade_data('data/bilateral_value_clean_23_withid.csv')
     country_coords = data_processing.get_country_coordinates()
-    print(country_coords)
-    print(country_coords['country'].tolist())
+    print(f"Loaded trade data for {len(trade_data)} trade relationships")
+    print(f"Loaded coordinates for {len(country_coords)} countries")
 
     # Step 2: Build the trade network graph
     print("Building trade network graph...")
-    # We call the function from graph_builder to create a Graph instance using our custom implementation.
     trade_graph = graph_builder.build_trade_graph(trade_data)
-    print(trade_graph)
-
-    # Step 2.5: Check all countries in graph have geographic data in country_coords
-    missing = find_missing_geographic_data(trade_graph, country_coords)
-    print(missing)
-    print(len(missing))
+    print(f"Created graph with {trade_graph.number_of_nodes()} nodes and {trade_graph.number_of_edges()} edges")
 
     # Step 3: Perform network analysis
     print("Performing network analysis...")
     analysis_results = analysis.analyze_trade_network(trade_graph)
+    print("Analysis complete")
 
-    # Step 4: Create and display the interactive visualization
+    # Step 4: Launch the integrated dashboard
+    print("Launching visualization dashboard...")
+    visualization.create_dashboard(trade_graph, country_coords, analysis_results)
+
+
+def run_simple_visualization() -> None:
+    """Run a simple, non-interactive visualization.
+
+    This function follows the same steps as run_trade_dashboard but creates
+    a static visualization that can be saved or displayed without a web server.
+    """
+    # Step 1: Load and process the trade data
+    trade_data = data_processing.load_trade_data('data/bilateral_value_clean_23_withid.csv')
+    country_coords = data_processing.get_country_coordinates()
+
+    # Step 2: Build the trade network graph
+    trade_graph = graph_builder.build_trade_graph(trade_data)
+
+    # Step 3: Perform network analysis
+    analysis_results = analysis.analyze_trade_network(trade_graph)
+
+    # Step 4: Create a static visualization
     print("Creating visualization...")
     viz = visualization.create_trade_visualization(trade_graph, country_coords, analysis_results)
-    viz.show()  # plotly visualization
+    viz.show()  # Display the visualization
 
-    print("Visualization complete!")
+    print("Visualization complete! You can save this figure using the export button in the top-right corner.")
 
 
 def run_sample_analysis() -> None:
-    """Run a sample analysis on the trade data without full visualization.
+    """Run a sample analysis on the trade data without visualization.
 
     This function demonstrates the core analysis capabilities:
     1. Load and process the trade data
@@ -88,6 +102,9 @@ def run_sample_analysis() -> None:
 
 
 if __name__ == "__main__":
-    # Uncomment the function you want to run
-    run_trade_visualization()
-    # run_sample_analysis()
+    # Run the integrated dashboard by default
+    run_trade_dashboard()
+
+    # Alternative running modes (uncomment to use):
+    # run_simple_visualization()  # For a simpler, non-interactive visualization
+    # run_sample_analysis()       # For analysis without visualization
