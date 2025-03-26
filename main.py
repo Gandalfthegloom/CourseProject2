@@ -6,7 +6,6 @@ visualization program. It integrates components for data processing, graph build
 analysis, and visualization to create an interactive representation of global trade networks.
 """
 
-import os
 import pandas as pd
 # import networkx as nx  # Not used now since we use our custom Graph class
 import plotly.graph_objects as go
@@ -15,6 +14,7 @@ import data_processing
 import graph_builder  # This module now provides our Graph class and build_trade_graph function
 import visualization
 import analysis
+from geodata_check import find_missing_geographic_data
 
 
 def run_trade_visualization() -> None:
@@ -30,11 +30,19 @@ def run_trade_visualization() -> None:
     print("Loading and processing trade data...")
     trade_data = data_processing.load_trade_data('data/bilateral_value_clean_23_withid.csv')
     country_coords = data_processing.get_country_coordinates()
+    print(country_coords)
+    print(country_coords['country'].tolist())
 
     # Step 2: Build the trade network graph
     print("Building trade network graph...")
     # We call the function from graph_builder to create a Graph instance using our custom implementation.
     trade_graph = graph_builder.build_trade_graph(trade_data)
+    print(trade_graph)
+
+    # Step 2.5: Check all countries in graph have geographic data in country_coords
+    missing = find_missing_geographic_data(trade_graph, country_coords)
+    print(missing)
+    print(len(missing))
 
     # Step 3: Perform network analysis
     print("Performing network analysis...")
@@ -43,7 +51,7 @@ def run_trade_visualization() -> None:
     # Step 4: Create and display the interactive visualization
     print("Creating visualization...")
     viz = visualization.create_trade_visualization(trade_graph, country_coords, analysis_results)
-    viz.show()
+    viz.show()  # plotly visualization
 
     print("Visualization complete!")
 

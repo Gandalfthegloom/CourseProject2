@@ -12,16 +12,16 @@ import pandas as pd
 
 def create_trade_visualization(
     graph: nx.DiGraph,
-    country_coords: Dict[str, Tuple[float, float]],
+    country_coords: pd.DataFrame,
     analysis_results: Dict[str, Any]
 ) -> go.Figure:
     """Create an interactive visualization of the global trade network.
-    
+
     Args:
         graph: The trade network graph
         country_coords: A dictionary mapping country IDs to (latitude, longitude) coordinates
         analysis_results: The dictionary of analysis results from the analysis module
-        
+
     Returns:
         A Plotly Figure object containing the interactive visualization
     """
@@ -37,17 +37,17 @@ def create_trade_visualization(
 def visualize_country_trade(
     graph: nx.DiGraph,
     country_id: str,
-    country_coords: Dict[str, Tuple[float, float]],
+    country_coords: pd.DataFrame,
     analysis_results: Dict[str, Any]
 ) -> go.Figure:
     """Create a visualization focused on a specific country's trade relationships.
-    
+
     Args:
         graph: The trade network graph
         country_id: The ID of the country to focus on
         country_coords: A dictionary mapping country IDs to (latitude, longitude) coordinates
         analysis_results: The dictionary of analysis results from the analysis module
-        
+
     Returns:
         A Plotly Figure object showing the selected country's trade relationships
     """
@@ -62,14 +62,14 @@ def visualize_country_trade(
 
 def create_country_selector(
     graph: nx.DiGraph,
-    country_coords: Dict[str, Tuple[float, float]],
+    country_coords: pd.DataFrame,
     analysis_results: Dict[str, Any]
 ) -> None:
     """Create an interactive dashboard with country selection dropdown.
-    
+
     This function creates and runs a Dash application that allows users to select
     a country and view its trade relationships.
-    
+
     Args:
         graph: The trade network graph
         country_coords: A dictionary mapping country IDs to (latitude, longitude) coordinates
@@ -94,7 +94,7 @@ def plot_trade_arrow(
     hover_text: str
 ) -> None:
     """Add a directional arrow representing a trade relationship to the map.
-    
+
     Args:
         fig: The Plotly Figure to add the arrow to
         start_lat, start_lon: Coordinates of the exporting country
@@ -116,13 +116,13 @@ def create_choropleth_map(
     title: str
 ) -> go.Figure:
     """Create a choropleth map showing a specific trade metric for each country.
-    
+
     Args:
         graph: The trade network graph
         metric: The metric to visualize ('exports', 'imports', 'balance', etc.)
         analysis_results: The dictionary of analysis results from the analysis module
         title: The title for the visualization
-        
+
     Returns:
         A Plotly Figure object containing the choropleth map
     """
@@ -137,7 +137,7 @@ def create_choropleth_map(
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
-    
+
     import python_ta
     python_ta.check_all(config={
         'extra-imports': ['pandas', 'networkx', 'plotly.graph_objects', 'typing'],
