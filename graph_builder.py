@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Any
 import pandas as pd
 import networkx as nx
 
-askldjalskjdlaksjdlkasjdlaksjdlkasjdlkasjdlakjaslkdjlk
+x = "skibidi"
 
 def build_trade_graph(trade_data: pd.DataFrame) -> nx.DiGraph:
     """Construct a directed graph from the trade data.
