@@ -1,4 +1,5 @@
-"""CSC111 Winter 2025: Global Trade Interdependence Visualization
+"""
+CSC111 Winter 2025: Global Trade Interdependence Visualization
 
 This module serves as the main entry point for running the Global Trade Interdependence
 visualization program. It integrates components for data processing, graph building,
@@ -7,11 +8,11 @@ analysis, and visualization to create an interactive representation of global tr
 
 import os
 import pandas as pd
-import networkx as nx
+# import networkx as nx  # Not used now since we use our custom Graph class
 import plotly.graph_objects as go
 
 import data_processing
-import graph_builder
+import graph_builder  # This module now provides our Graph class and build_trade_graph function
 import visualization
 import analysis
 
@@ -27,11 +28,12 @@ def run_trade_visualization() -> None:
     """
     # Step 1: Load and process the trade data
     print("Loading and processing trade data...")
-    trade_data = data_processing.load_trade_data('Data/bilateral_value_clean_23_withid.csv')
+    trade_data = data_processing.load_trade_data('data/bilateral_value_clean_23_withid.csv')
     country_coords = data_processing.get_country_coordinates()
 
     # Step 2: Build the trade network graph
     print("Building trade network graph...")
+    # We call the function from graph_builder to create a Graph instance using our custom implementation.
     trade_graph = graph_builder.build_trade_graph(trade_data)
 
     # Step 3: Perform network analysis

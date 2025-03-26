@@ -1,95 +1,112 @@
-"""CSC111 Project 2: Global Trade Interdependence - Graph Builder
+"""
+CSC111 Project 2: Global Trade Interdependence - Graph Builder
 
-This module contains functions for creating and manipulating the trade network graph.
-It transforms processed trade data into a directed graph where nodes represent countries
-and edges represent trade relationships.
+This module defines a Graph class for building a trade network graph and a Vertex class
+to represent each country with its export and import relationships. The build_trade_graph
+function constructs the graph from processed trade data.
 """
 
-from typing import Dict, List, Tuple, Any
+from typing import Dict
 import pandas as pd
-import networkx as nx
 
-def build_trade_graph(trade_data: pd.DataFrame) -> nx.DiGraph:
-    """Construct a directed graph from the trade data.
-    
-    Args:
-        trade_data: A pandas DataFrame containing the processed trade data
-        
-    Returns:
-        A NetworkX DiGraph where:
-        - Nodes represent countries (with attributes like name, total_exports, total_imports)
-        - Edges represent trade relationships (with attributes like trade_value, normalized_value)
-        
-    Preconditions:
-        - trade_data has columns: 'exporter_id', 'exporter_name', 'importer_id', 'importer_name', 'value'
+class Vertex:
+    def __init__(self, item: str):
+        """
+        Initialize a Vertex representing a country.
+
+        Args:
+            item: The country's name.
+        """
+        self.item = item  # Country name
+        self.export_to: Dict[str, float] = {}
+        self.import_from: Dict[str, float] = {}
+
+    def __repr__(self) -> str:
+        return f"Vertex({self.item})"
+
+
+class Graph:
+    def __init__(self):
+        """
+        Initialize an empty Graph.
+        """
+        self.vertices: Dict[str, Vertex] = {}
+
+    def add_vertex(self, country_id: str, country_name: str) -> None:
+        """
+        Add a vertex representing a country to the graph.
+
+        Args:
+            country_id: A unique identifier for the country.
+            country_name: The country's name.
+        """
+        if country_id not in self.vertices:
+            self.vertices[country_id] = Vertex(country_name)
+        else:
+            # Optionally, update the country name if necessary.
+            pass
+
+    def add_edge(self, exporter_id: str, importer_id: str, value: float) -> None:
+        """
+        Add an edge representing a trade relationship from exporter to importer.
+
+        This method updates:
+          - The export_to dictionary for the exporter vertex.
+          - The import_from dictionary for the importer vertex.
+
+        Args:
+            exporter_id: The unique identifier for the exporting country.
+            importer_id: The unique identifier for the importing country.
+            value: The trade value.
+        """
+        if exporter_id not in self.vertices or importer_id not in self.vertices:
+            raise ValueError("Both exporter and importer must be added as vertices first.")
+
+        exporter_vertex = self.vertices[exporter_id]
+        importer_vertex = self.vertices[importer_id]
+
+        exporter_vertex.export_to[importer_vertex.item] = value
+        importer_vertex.import_from[exporter_vertex.item] = value
+
+    def __repr__(self) -> str:
+        return f"Graph(vertices={list(self.vertices.keys())})"
+
+
+def build_trade_graph(trade_data: pd.DataFrame) -> Graph:
     """
-    # Create a new directed graph
-    # Add nodes for each unique country
-    # Add edges for each trade relationship
-    # Calculate and add node attributes (total exports, imports, etc.)
-    # Return the constructed graph
-    pass
+    Constructs a trade graph from the processed trade data.
 
-
-def normalize_edge_weights(graph: nx.DiGraph, attribute: str = 'value', new_attribute: str = 'normalized_value') -> nx.DiGraph:
-    """Normalize the edge weights in the graph for better visualization.
-    
     Args:
-        graph: The trade network graph
-        attribute: The edge attribute to normalize
-        new_attribute: The name of the new normalized attribute
-        
+        trade_data: A pandas DataFrame containing the trade data with columns:
+                    'exporter_id', 'exporter_name', 'importer_id', 'importer_name', 'value'
+
     Returns:
-        The modified graph with normalized edge weights
+        A Graph instance populated with vertices representing countries and edges representing
+        trade relationships. Each vertex stores:
+            - item: The country name.
+            - export_to: A dictionary mapping partner country names (exports) to trade values.
+            - import_from: A dictionary mapping partner country names (imports) to trade values.
     """
-    # Find the maximum and minimum values for the specified attribute
-    # Add a new normalized attribute to each edge
-    # Return the modified graph
-    pass
+    graph = Graph()
+
+    # Iterate through each row of the DataFrame and update the graph accordingly.
+    for _, row in trade_data.iterrows():
+        exporter_id = row['exporter_id']
+        exporter_name = row['exporter_name']
+        importer_id = row['importer_id']
+        importer_name = row['importer_name']
+        value = row['value']
+
+        # Add exporter and importer vertices if they do not already exist.
+        graph.add_vertex(exporter_id, exporter_name)
+        graph.add_vertex(importer_id, importer_name)
+
+        # Add the edge representing the trade relationship.
+        graph.add_edge(exporter_id, importer_id, value)
+
+    return graph
 
 
-def filter_graph_by_threshold(graph: nx.DiGraph, threshold: float, attribute: str = 'value') -> nx.DiGraph:
-    """Create a subgraph containing only edges with weights above a certain threshold.
-    
-    Args:
-        graph: The trade network graph
-        threshold: The minimum value for an edge to be included
-        attribute: The edge attribute to compare against the threshold
-        
-    Returns:
-        A subgraph containing only the edges that meet the threshold criterion
-    """
-    # Create a list of edges to keep
-    # Create a new graph with the same nodes but only the filtered edges
-    pass
-
-
-def get_country_subgraph(graph: nx.DiGraph, country_id: str, include_imports: bool = True, include_exports: bool = True) -> nx.DiGraph:
-    """Extract a subgraph centered on a specific country.
-    
-    Args:
-        graph: The trade network graph
-        country_id: The ID of the country to focus on
-        include_imports: Whether to include edges representing imports to the country
-        include_exports: Whether to include edges representing exports from the country
-        
-    Returns:
-        A subgraph containing only the specified country and its direct trade partners
-    """
-    # Create a new graph
-    # Add the specified country node
-    # Add relevant trade partner nodes and edges based on the parameters
-    pass
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     import doctest
     doctest.testmod()
-    
-    import python_ta
-    python_ta.check_all(config={
-        'extra-imports': ['pandas', 'networkx', 'typing'],
-        'allowed-io': [],
-        'max-line-length': 100,
-        'disable': ['R1705', 'C0200']
-    })
