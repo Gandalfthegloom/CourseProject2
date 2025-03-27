@@ -94,6 +94,49 @@ def get_country_coordinates() -> pd.DataFrame:
     return full_coords
 
 
+def load_gdp_data(file_path: str) -> pd.DataFrame:
+    """Load GDP data from a World Bank CSV file.
+
+    This function reads a World Bank CSV file containing GDP data and extracts
+    only the country name, country code, and 2023 values for the specified indicator.
+
+    Args:
+        file_path: The path to the World Bank GDP data file (CSV format)
+
+    Returns:
+        A pandas DataFrame containing country name, country code, and 2023 GDP values
+
+    Preconditions:
+        - file_path refers to a valid CSV file with World Bank format
+        - The CSV contains columns "Country Name", "Country Code", and "2023"
+    """
+    # Load the full CSV file
+    df = pd.read_csv(file_path)
+
+    # Select only the required columns
+    df = df[['Country Name', 'Country Code', '2023']]
+
+    # Rename columns for consistency
+    df = df.rename(columns={
+        'Country Name': 'country_name',
+        'Country Code': 'country_code',
+        '2023': 'gdp_2023'
+    })
+
+    # Convert GDP values to numeric, coercing errors to NaN
+    df['gdp_2023'] = pd.to_numeric(df['gdp_2023'], errors='coerce')
+
+    # Drop rows with missing GDP values
+    df = df.dropna(subset=['gdp_2023'])
+
+    # Convert country code to string
+    df['country_code'] = df['country_code'].astype(str)
+
+    print(f"Successfully loaded GDP data for {len(df)} countries")
+
+    return df
+
+
 def filter_by_trade_volume(data: pd.DataFrame, min_value: float) -> pd.DataFrame:
     """Filter the trade data to include only relationships above a certain value threshold.
 
@@ -105,7 +148,9 @@ def filter_by_trade_volume(data: pd.DataFrame, min_value: float) -> pd.DataFrame
         A filtered DataFrame containing only the trade relationships above the threshold
     """
     # Filter the DataFrame based on the 'value' column
-    pass
+    filtered_data = data[data['value'] >= min_value]
+    print(f"Filtered data from {len(data)} to {len(filtered_data)} trade relationships")
+    return filtered_data
 
 
 def get_top_trading_partners(data: pd.DataFrame, country_id: str, n: int = 10) -> pd.DataFrame:
@@ -120,8 +165,12 @@ def get_top_trading_partners(data: pd.DataFrame, country_id: str, n: int = 10) -
         A DataFrame containing the top n trading partners sorted by trade value
     """
     # Filter for exports from the specified country
-    # Sort by value and return the top n
-    pass
+    exports = data[data['exporter_id'] == country_id].copy()
+
+    # Sort by value in descending order and take the top n
+    top_partners = exports.sort_values('value', ascending=False).head(n)
+
+    return top_partners
 
 
 if __name__ == '__main__':

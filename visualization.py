@@ -300,7 +300,8 @@ def create_choropleth_map(
         graph: nx.DiGraph,
         metric: str,
         country_coords: pd.DataFrame,
-        title: str
+        title: str,
+        gdp_data: Optional[pd.DataFrame] = None
 ) -> go.Figure:
     """Create a hybrid choropleth-scatter map showing trade metrics for all countries.
 
@@ -309,9 +310,10 @@ def create_choropleth_map(
 
     Args:
         graph: NetworkX DiGraph containing trade data
-        metric: Which trade metric to visualize ('exports', 'imports', 'balance', or 'total')
+        metric: Which trade metric to visualize ('exports', 'imports', 'balance', 'total', or 'openness')
         country_coords: DataFrame with country coordinates
         title: Title for the visualization
+        gdp_data: Optional DataFrame with GDP data (required for 'openness' metric)
 
     Returns:
         A Plotly figure object with the visualization
@@ -364,9 +366,17 @@ def create_choropleth_map(
     nonstandard_lats = []
     nonstandard_lons = []
 
+    # Prepare ISO code to country name mapping for GDP data
+    iso_to_country = {}
+    if gdp_data is not None:
+        for _, row in gdp_data.iterrows():
+            iso_to_country[row['country_code'].lower()] = row['country_name']
+
     # Set up the color scale based on metric
     if metric == 'balance':
         color_scale = 'RdBu'  # Red-Blue for negative-positive values
+    elif metric == 'openness':
+        color_scale = 'Viridis'  # A different color scale for openness
     else:
         color_scale = 'Blues'  # Blues for other metrics
 
@@ -374,8 +384,28 @@ def create_choropleth_map(
     for node_id, data in graph.nodes(data=True):
         country_name = data['name']
 
-        # Determine the value based on the selected metric
-        if metric == 'exports':
+        # For openness metric, we need to match with GDP data using ISO codes
+        if metric == 'openness' and gdp_data is not None:
+            # Get the country's ISO code
+            country_iso = node_id.lower()  # Assuming node_id is the ISO code
+
+            # Try to find the GDP data for this country
+            gdp_value = gdp_data.loc[gdp_data['country_code'].str.lower() == country_iso, 'gdp_2023'].iloc[0] if not \
+            gdp_data[gdp_data['country_code'].str.lower() == country_iso].empty else None
+
+            # Calculate openness index if GDP data is available
+            if gdp_value is not None and gdp_value > 0:
+                total_trade = data['total_exports'] + data['total_imports']
+                value = (total_trade / gdp_value) * 100  # As percentage
+                text = (f"<b>{country_name}</b><br>"
+                        f"Trade Openness: {value:.2f}%<br>"
+                        f"Total Trade: ${total_trade:,.2f}<br>"
+                        f"GDP: ${gdp_value:,.2f}")
+            else:
+                # Skip countries with no GDP data for openness metric
+                continue
+        # Determine the value based on other selected metrics
+        elif metric == 'exports':
             value = data['total_exports']
             text = f"<b>{country_name}</b><br>Total Exports: ${value:,.2f}"
         elif metric == 'imports':
@@ -420,7 +450,7 @@ def create_choropleth_map(
     # Create the figure
     fig = go.Figure()
 
-    # Get color scale configuration
+    # Configure color scale and range
     if metric == 'balance':
         # For balance, we want a diverging scale centered at 0
         max_abs_value = max(
@@ -431,8 +461,16 @@ def create_choropleth_map(
         zmax = max_abs_value
 
         # Balance-specific tick formatting
-        tick_values = [-2e12, -1e12, -0.5e12, 0, 0.5e12, 1e12, 2e12]
-        tick_texts = ['-$2T', '-$1T', '-$0.5T', '$0', '$0.5T', '$1T', '$2T']
+        tick_values = [-1, -0.5, 0, 0.5, 1]
+        tick_texts = ['-100%', '-50%', '0%', '50%', '100%']
+    elif metric == 'openness':
+        # For openness, we want a scale from 0 to max (or a reasonable upper limit like 150%)
+        zmin = 0
+        zmax = min(150, max(standard_values + nonstandard_values, default=100))
+
+        # Openness-specific tick formatting
+        tick_values = [0, 25, 50, 75, 100, 125, 150]
+        tick_texts = ['0%', '25%', '50%', '75%', '100%', '125%', '150%']
     else:
         # For other metrics, we want a sequential scale starting at 0
         zmin = 0
@@ -461,7 +499,7 @@ def create_choropleth_map(
             marker_line_color='darkgray',
             marker_line_width=0.5,
             colorbar=dict(
-                title=f'{metric.capitalize()} (USD)',
+                title=f'{title.split(" ")[1]} ({metric.capitalize()})',
                 thicknessmode='pixels',
                 thickness=20,
                 lenmode='pixels',
@@ -483,7 +521,7 @@ def create_choropleth_map(
         # Using log scale to handle wide range of values
         node_sizes = [max(7, 5 + (abs(val) / 1e9) ** 0.5) for val in nonstandard_values]
 
-        # For balance metric, we need to handle negative values differently for color
+        # For balance and openness metrics, we need to handle coloring differently
         if metric == 'balance':
             # Normalize between -1 and 1 for coloring
             node_colors = []
@@ -498,6 +536,12 @@ def create_choropleth_map(
 
             scatter_colorscale = 'RdBu'
             scatter_cmin = -1
+            scatter_cmax = 1
+        elif metric == 'openness':
+            # Normalize between 0 and zmax for coloring
+            node_colors = [min(1, val / zmax) for val in nonstandard_values]
+            scatter_colorscale = 'Viridis'
+            scatter_cmin = 0
             scatter_cmax = 1
         else:
             # For exports, imports, total - just normalize from 0 to max
@@ -549,7 +593,8 @@ def create_choropleth_map(
 def create_dashboard(
         graph: nx.DiGraph,
         country_coords: pd.DataFrame,
-        analysis_results: Dict[str, Any]
+        analysis_results: Dict[str, Any],
+        gdp_data: Optional[pd.DataFrame] = None
 ) -> None:
     """Create an integrated dashboard with visualization options."""
     # Create a list of countries for the dropdown
@@ -673,7 +718,8 @@ def create_dashboard(
                             {'label': '📤 Total Exports', 'value': 'exports'},
                             {'label': '📥 Total Imports', 'value': 'imports'},
                             {'label': '⚖️ Trade Balance', 'value': 'balance'},
-                            {'label': '💱 Total Trade Volume', 'value': 'total'}
+                            {'label': '💱 Total Trade Volume', 'value': 'total'},
+                            {'label': '🔄 Trade Openness Index', 'value': 'openness'}
                         ],
                         value='exports',  # Set default to total exports
                         style={
@@ -691,7 +737,8 @@ def create_dashboard(
                         graph,
                         'exports',
                         country_coords,
-                        '📤 Global Export Volume by Country'
+                        '📤 Global Export Volume by Country',
+                        gdp_data
                     )
                 )
             ])
@@ -718,13 +765,15 @@ def create_dashboard(
             'exports': '📤 Global Export Volume by Country',
             'imports': '📥 Global Import Volume by Country',
             'balance': '⚖️ Trade Balance by Country',
-            'total': '💱 Total Trade Volume by Country'
+            'total': '💱 Total Trade Volume by Country',
+            'openness': '🔄 Trade Openness Index by Country'
         }
         return create_choropleth_map(
             graph,
             selected_metric,
             country_coords,
-            titles[selected_metric]
+            titles[selected_metric],
+            gdp_data
         )
 
     # Configure the app to enable callback exceptions

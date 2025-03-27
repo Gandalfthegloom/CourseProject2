@@ -18,9 +18,10 @@ import visualization
 import analysis
 
 TRADE_DATA = 'Data/bilateral_value_clean_23_withid.csv'  # Default data to be used
+GDP_DATA = 'Data/world_bank_gdp/API_NY.GDP.MKTP.CD_DS2_en_csv_v2_26433.csv'
 
 
-def run_trade_dashboard(filename: str = TRADE_DATA) -> None:
+def run_trade_dashboard(filename: str = TRADE_DATA, gdp: str = GDP_DATA) -> None:
     """Run the complete trade visualization dashboard.
 
     This function orchestrates the following steps:
@@ -39,6 +40,10 @@ def run_trade_dashboard(filename: str = TRADE_DATA) -> None:
     print(f"Loaded trade data for {len(trade_data)} trade relationships")
     print(f"Loaded coordinates for {len(country_coords)} countries")
 
+    # Load GDP data for openness index calculation
+    gdp_data = data_processing.load_gdp_data(gdp)
+    print(f"Loaded GDP data for {len(gdp_data)} countries")
+
     # Step 2: Build the trade network graph
     print("Building trade network graph...")
     trade_graph = build_trade_graph(trade_data)
@@ -51,7 +56,7 @@ def run_trade_dashboard(filename: str = TRADE_DATA) -> None:
 
     # Step 4: Launch the integrated dashboard
     print("Launching visualization dashboard...")
-    visualization.create_dashboard(trade_graph, country_coords, analysis_results)
+    visualization.create_dashboard(trade_graph, country_coords, analysis_results, gdp_data)
 
 
 def run_simple_visualization(filename: str = TRADE_DATA) -> None:
