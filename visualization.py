@@ -41,7 +41,7 @@ def create_trade_visualization(
 
             # Calculate node size based on total trade volume
             total_trade = data['total_exports'] + data['total_imports']
-            node_size = 7 + (total_trade / 1e9) ** 0.49   # Log scale to handle wide range of values
+            node_size = 7 + (total_trade / 1e9) ** 0.49  # Log scale to handle wide range of values
 
             # Calculate node color based on trade balance
             trade_balance = data['total_exports'] - data['total_imports']
@@ -314,6 +314,88 @@ def create_choropleth_map(
     country_coord_map = dict(zip(country_coords['country'],
                                  zip(country_coords['centroid_lat'], country_coords['centroid_lon'])))
 
+    # Collect values
+    metric_values = []
+    for node_id, data in graph.nodes(data=True):
+        country_name = data['name']
+
+        if country_name in country_coord_map:
+            # Determine the value based on the selected metric
+            if metric == 'exports':
+                value = data['total_exports']
+            elif metric == 'imports':
+                value = data['total_imports']
+            elif metric == 'balance':
+                value = data['total_exports'] - data['total_imports']
+            else:  # 'total'
+                value = data['total_exports'] + data['total_imports']
+
+            metric_values.append(value)
+
+    # Custom color mapping based on trade balance
+    def get_color_scale(value):
+        if metric == 'balance':
+            # For trade balance, use blue to red scale
+            if value > 0:
+                # Positive balance (blue scale)
+                if value < 0.5e12:  # Less than 0.5 trillion
+                    return '#e0f3f8'  # Very Light Blue
+                elif value < 1e12:  # 0.5-1 trillion
+                    return '#91bfdb'  # Light Blue
+                elif value < 2e12:  # 1-2 trillion
+                    return '#4575b4'  # Medium Blue
+                else:  # Over 2 trillion
+                    return '#313695'  # Dark Blue
+            else:
+                # Negative balance (red scale)
+                if value > -0.5e12:  # Greater than -0.5 trillion
+                    return '#fee5d9'  # Very Light Red
+                elif value > -1e12:  # -0.5 to -1 trillion
+                    return '#fcae91'  # Light Red
+                elif value > -2e12:  # -1 to -2 trillion
+                    return '#fb6a4a'  # Medium Red
+                else:  # Less than -2 trillion
+                    return '#de2d26'  # Dark Red
+        else:
+            # For other metrics, use blue scale
+            if value < 1e12:  # Less than 1 trillion
+                return '#e0f3f8'  # Very Light Blue
+            elif value < 2e12:  # 1-2 trillion
+                return '#91bfdb'  # Light Blue
+            elif value < 3e12:  # 2-3 trillion
+                return '#4575b4'  # Medium Blue
+            elif value < 4e12:  # 3-4 trillion
+                return '#313695'  # Dark Blue
+            else:  # Over 4 trillion
+                return '#081d58'  # Very Dark Blue
+
+    # Create color scale for the visualization
+    if metric == 'balance':
+        color_scale = [
+            [0, '#de2d26'],  # Darkest Red (large negative)
+            [0.25, '#fb6a4a'],  # Medium Red
+            [0.5, '#ffffff'],  # White (neutral)
+            [0.75, '#4575b4'],  # Medium Blue
+            [1, '#313695']  # Darkest Blue (large positive)
+        ]
+        # Determine appropriate tick values and labels
+        tick_values = [-2e12, -1e12, -0.5e12, 0, 0.5e12, 1e12, 2e12]
+        tick_texts = [
+            '-$2T', '-$1T', '-$0.5T', '$0',
+            '$0.5T', '$1T', '$2T'
+        ]
+    else:
+        color_scale = [
+            [0, '#e0f3f8'],  # < 1T
+            [0.25, '#91bfdb'],  # 1-2T
+            [0.5, '#4575b4'],  # 2-3T
+            [0.75, '#313695'],  # 3-4T
+            [1, '#081d58']  # > 4T
+        ]
+        # Use previous tick values for other metrics
+        tick_values = [1e12, 2e12, 3e12, 4e12, max(values) if values else 4e12]
+        tick_texts = ['$1T', '$2T', '$3T', '$4T', f'${max(values) / 1e12:.1f}T' if values else '$4T']
+
     for node_id, data in graph.nodes(data=True):
         country_name = data['name']
 
@@ -340,22 +422,32 @@ def create_choropleth_map(
             lats.append(lat)
             lons.append(lon)
 
-    # Create a figure with bubbles on a map (alternative to choropleth)
-    fig = go.Figure()
-
-    # Add bubbles for each country
-    fig.add_trace(go.Scattergeo(
+    # Create a figure with bubbles on a map
+    fig = go.Figure(data=go.Scattergeo(
         lon=lons,
         lat=lats,
         text=texts,
         mode='markers',
         marker=dict(
-            size=np.log1p(np.abs(values)) * 2,  # Size based on value (log scale)
+            # Adjusted size scaling to be more linear
+            size=np.log1p(np.abs(values)) * 3,
+            # Custom color mapping
             color=values,
-            colorscale='RdYlGn' if metric == 'balance' else 'Viridis',
-            colorbar=dict(title=f"{metric.capitalize()} (USD)"),
-            cmin=min(values) if min(values) < 0 else None,
-            cmax=max(values),
+            colorscale=color_scale,
+            colorbar=dict(
+                title=f'{metric.capitalize()} (USD)',
+                thicknessmode='pixels',
+                thickness=20,
+                lenmode='pixels',
+                len=300,
+                yanchor='bottom',
+                y=0,
+                x=1.01,
+                tickmode='array',
+                tickvals=tick_values,
+                ticktext=tick_texts
+            ),
+            showscale=True,
             line=dict(width=1, color='black')
         ),
         hoverinfo='text',
@@ -376,12 +468,11 @@ def create_choropleth_map(
             showlakes=True,
             lakecolor='rgb(220, 240, 255)'
         ),
-        height=800,
-        margin=dict(l=0, r=0, t=50, b=0)
+        height=900,
+        margin=dict(l=0, r=150, t=50, b=100)
     )
 
     return fig
-
 
 def create_dashboard(
         graph: nx.DiGraph,
@@ -433,18 +524,18 @@ def create_dashboard(
             dcc.Tabs(id='main-tabs', value='global-network',  # Set default value to 'global-network'
                      style={'width': '100%', 'display': 'flex', 'justifyContent': 'center'},
                      children=[
-                dcc.Tab(label='🌍 Global Network', value='global-network',
-                        style={'padding': '15px', 'fontSize': '1.1em'}),
-                dcc.Tab(label='🏴 Country Details', value='country-trade',
-                        style={'padding': '15px', 'fontSize': '1.1em'}),
-                dcc.Tab(label='📊 Trade Metrics', value='trade-metrics',
-                        style={'padding': '15px', 'fontSize': '1.1em'})
-            ],
-            colors={
-                "border": "#2c3e50",
-                "primary": "#3498db",
-                "background": "#ecf0f1"
-            }),
+                         dcc.Tab(label='🌍 Global Network', value='global-network',
+                                 style={'padding': '15px', 'fontSize': '1.1em'}),
+                         dcc.Tab(label='🏴 Country Details', value='country-trade',
+                                 style={'padding': '15px', 'fontSize': '1.1em'}),
+                         dcc.Tab(label='📊 Trade Metrics', value='trade-metrics',
+                                 style={'padding': '15px', 'fontSize': '1.1em'})
+                     ],
+                     colors={
+                         "border": "#2c3e50",
+                         "primary": "#3498db",
+                         "background": "#ecf0f1"
+                     }),
 
             # Dynamic content area
             html.Div(id='tabs-content', style={
@@ -636,21 +727,66 @@ def plot_trade_arrow(
 
 def get_flag_emoji(country_name):
     """Generate a flag emoji for a given country name."""
-    flag_emojis = {
-        'United States': '🇺🇸', 'China': '🇨🇳', 'Japan': '🇯🇵',
-        'Germany': '🇩🇪', 'United Kingdom': '🇬🇧', 'France': '🇫🇷',
-        'India': '🇮🇳', 'Brazil': '🇧🇷', 'Italy': '🇮🇹',
-        'Canada': '🇨🇦', 'Russia': '🇷🇺', 'South Korea': '🇰🇷',
-        # Add more countries as needed
-    }
+    flag_emojis = {'Afghanistan': '🇦🇫', 'Albania': '🇦🇱', 'Algeria': '🇩🇿', 'Angola': '🇦🇴', 'Argentina': '🇦🇷',
+                   'Australia': '🇦🇺', 'Austria': '🇦🇹', 'Bahrain': '🇧🇭', 'Bangladesh': '🇧🇩', 'Belgium': '🇧🇪',
+                   'Benin': '🇧🇯', 'Bolivia': '🇧🇴', 'Bosnia and Herzegovina': '🇧🇦', 'Botswana': '🇧🇼', 'Brazil': '🇧🇷',
+                   'Bulgaria': '🇧🇬', 'Burkina Faso': '🇧🇫', 'Burundi': '🇧🇮', 'Cambodia': '🇰🇭', 'Cameroon': '🇨🇲',
+                   'Canada': '🇨🇦', 'Central African Republic': '🇨🇫', 'Chad': '🇹🇩', 'Chile': '🇨🇱', 'China': '🇨🇳',
+                   'Colombia': '🇨🇴', 'Comoros': '🇰🇲', 'Democratic Republic of the Congo': '🇨🇩',
+                   'Republic of the Congo': '🇨🇬', 'Costa Rica': '🇨🇷', "Cote d'Ivoire": '🇨🇮', 'Croatia': '🇭🇷',
+                   'Cuba': '🇨🇺', 'Czechia': '🇨🇿', 'Denmark': '🇩🇰', 'Djibouti': '🇩🇯', 'Dominican Republic': '🇩🇴',
+                   'Ecuador': '🇪🇨', 'Egypt': '🇪🇬', 'El Salvador': '🇸🇻', 'Equatorial Guinea': '🇬🇶', 'Eritrea': '🇪🇷',
+                   'Ethiopia': '🇪🇹', 'Finland': '🇫🇮', 'France': '🇫🇷', 'Gabon': '🇬🇦', 'Gambia': '🇬🇲', 'Germany': '🇩🇪',
+                   'Ghana': '🇬🇭', 'Greece': '🇬🇷', 'Guatemala': '🇬🇹', 'Guinea': '🇬🇳', 'Guinea-Bissau': '🇬🇼',
+                   'Haiti': '🇭🇹', 'Honduras': '🇭🇳', 'Hong Kong': '🇭🇰', 'Hungary': '🇭🇺', 'Iceland': '🇮🇸', 'India': '🇮🇳',
+                   'Indonesia': '🇮🇩', 'Iran': '🇮🇷', 'Iraq': '🇮🇶', 'Ireland': '🇮🇪', 'Israel': '🇮🇱', 'Italy': '🇮🇹',
+                   'Jamaica': '🇯🇲', 'Japan': '🇯🇵', 'Jordan': '🇯🇴', 'Kenya': '🇰🇪', 'North Korea': '🇰🇵',
+                   'South Korea': '🇰🇷', 'Kuwait': '🇰🇼', 'Lebanon': '🇱🇧', 'Lesotho': '🇱🇸', 'Liberia': '🇱🇷',
+                   'Libya': '🇱🇾', 'Madagascar': '🇲🇬', 'Malawi': '🇲🇼', 'Malaysia': '🇲🇾', 'Mali': '🇲🇱',
+                   'Mauritania': '🇲🇷', 'Mauritius': '🇲🇺', 'Mexico': '🇲🇽', 'Mongolia': '🇲🇳', 'Montenegro': '🇲🇪',
+                   'Morocco': '🇲🇦', 'Mozambique': '🇲🇿', 'Burma': '🇲🇲', 'Namibia': '🇳🇦', 'Nepal': '🇳🇵',
+                   'Netherlands': '🇳🇱', 'New Zealand': '🇳🇿', 'Nicaragua': '🇳🇮', 'Niger': '🇳🇪', 'Nigeria': '🇳🇬',
+                   'Norway': '🇳🇴', 'Oman': '🇴🇲', 'Pakistan': '🇵🇰', 'Panama': '🇵🇦', 'Paraguay': '🇵🇾', 'Peru': '🇵🇪',
+                   'Philippines': '🇵🇭', 'Poland': '🇵🇱', 'Portugal': '🇵🇹', 'Puerto Rico': '🇵🇷', 'Reunion': '🇷🇪',
+                   'Romania': '🇷🇴', 'Rwanda': '🇷🇼', 'Sao Tome and Principe': '🇸🇹', 'Saudi Arabia': '🇸🇦',
+                   'Senegal': '🇸🇳', 'Serbia': '🇷🇸', 'Sierra Leone': '🇸🇱', 'Singapore': '🇸🇬', 'Slovakia': '🇸🇰',
+                   'Slovenia': '🇸🇮', 'Somalia': '🇸🇴', 'South Africa': '🇿🇦', 'Spain': '🇪🇸', 'Sri Lanka': '🇱🇰',
+                   'Sudan': '🇸🇩', 'Eswatini': '🇸🇿', 'Sweden': '🇸🇪', 'Switzerland': '🇨🇭', 'Syria': '🇸🇾',
+                   'Chinese Taipei': '🇹🇼', 'Tanzania': '🇹🇿', 'Thailand': '🇹🇭', 'Togo': '🇹🇬',
+                   'Trinidad and Tobago': '🇹🇹', 'Tunisia': '🇹🇳', 'Turkey': '🇹🇷', 'Uganda': '🇺🇬',
+                   'United Kingdom': '🇬🇧', 'United States': '🇺🇸', 'Uruguay': '🇺🇾', 'Venezuela': '🇻🇪', 'Vietnam': '🇻🇳',
+                   'Palestine': '🇵🇸', 'Yemen': '🇾🇪', 'Zambia': '🇿🇲', 'Zimbabwe': '🇿🇼', 'Aruba': '🇦🇼', 'Anguilla': '🇦🇮',
+                   'Andorra': '🇦🇩', 'United Arab Emirates': '🇦🇪', 'Armenia': '🇦🇲', 'American Samoa': '🇦🇸',
+                   'French South Antarctic Territory': '🇹🇫', 'Antigua and Barbuda': '🇦🇬', 'Azerbaijan': '🇦🇿',
+                   'Bonaire': '🇧🇶', 'Bahamas': '🇧🇸', 'Saint Barthélemy': '🇧🇱', 'Belarus': '🇧🇾', 'Belize': '🇧🇿',
+                   'Bermuda': '🇧🇲', 'Barbados': '🇧🇧', 'Brunei': '🇧🇳', 'Bhutan': '🇧🇹', 'Cocos (Keeling) Islands': '🇨🇨',
+                   'Cook Islands': '🇨🇰', 'Cape Verde': '🇨🇻', 'Curaçao': '🇨🇼', 'Christmas Island': '🇨🇽',
+                   'Cayman Islands': '🇰🇾', 'Cyprus': '🇨🇾', 'Dominica': '🇩🇲', 'Estonia': '🇪🇪', 'Fiji': '🇫🇯',
+                   'Falkland Islands': '🇫🇰', 'Micronesia': '🇫🇲', 'Georgia': '🇬🇪', 'Gibraltar': '🇬🇮', 'Grenada': '🇬🇩',
+                   'Greenland': '🇬🇱', 'Guam': '🇬🇺', 'Guyana': '🇬🇾', 'British Indian Ocean Territory': '🇮🇴',
+                   'Kazakhstan': '🇰🇿', 'Kyrgyzstan': '🇰🇬', 'Kiribati': '🇰🇮', 'Saint Kitts and Nevis': '🇰🇳',
+                   'Laos': '🇱🇦', 'Saint Lucia': '🇱🇨', 'Lithuania': '🇱🇹', 'Luxembourg': '🇱🇺', 'Latvia': '🇱🇻',
+                   'Macau': '🇲🇴', 'Saint Martin': '🇲🇫', 'Moldova': '🇲🇩', 'Maldives': '🇲🇻', 'Marshall Islands': '🇲🇭',
+                   'North Macedonia': '🇲🇰', 'Malta': '🇲🇹', 'Northern Mariana Islands': '🇲🇵', 'Montserrat': '🇲🇸',
+                   'New Caledonia': '🇳🇨', 'Norfolk Island': '🇳🇫', 'Niue': '🇳🇺', 'Nauru': '🇳🇷',
+                   'Pitcairn Islands': '🇵🇳', 'Palau': '🇵🇼', 'Papua New Guinea': '🇵🇬', 'French Polynesia': '🇵🇫',
+                   'Qatar': '🇶🇦', 'Russia': '🇷🇺', 'Saint Helena': '🇸🇭', 'Solomon Islands': '🇸🇧', 'San Marino': '🇸🇲',
+                   'Saint Pierre and Miquelon': '🇵🇲', 'South Sudan': '🇸🇸', 'Suriname': '🇸🇷', 'Seychelles': '🇸🇨',
+                   'Turks and Caicos Islands': '🇹🇨', 'Tajikistan': '🇹🇯', 'Tokelau': '🇹🇰', 'Turkmenistan': '🇹🇲',
+                   'Timor-Leste': '🇹🇱', 'Tonga': '🇹🇴', 'Tuvalu': '🇹🇻', 'Ukraine': '🇺🇦', 'Uzbekistan': '🇺🇿',
+                   'Saint Vincent and the Grenadines': '🇻🇨', 'British Virgin Islands': '🇻🇬', 'Vanuatu': '🇻🇺',
+                   'Wallis and Futuna': '🇼🇫', 'Samoa': '🇼🇸'}
+
     return flag_emojis.get(country_name, '🌍')  # Default to globe if no flag found
 
 
 if __name__ == '__main__':
     import doctest
+
     doctest.testmod()
 
     import python_ta
+
     python_ta.check_all(config={
         'extra-imports': ['pandas', 'networkx', 'plotly.graph_objects', 'typing', 'numpy', 'dash', 'random'],
         'allowed-io': ['create_dashboard'],
