@@ -104,7 +104,7 @@ def create_trade_visualization(
         # Sort edges for this country by value
         edges.sort(key=lambda x: x[2], reverse=True)
         # Take top 5 or fewer if less than 5 exist
-        top_country_edges = edges[:100]
+        top_country_edges = edges[:5]
         top_edges.extend(top_country_edges)
 
     # Add arrows for each top trade relationship
@@ -391,7 +391,7 @@ def create_choropleth_map(
 
             # Try to find the GDP data for this country
             gdp_value = gdp_data.loc[gdp_data['country_code'].str.lower() == country_iso, 'gdp_2023'].iloc[0] if not \
-            gdp_data[gdp_data['country_code'].str.lower() == country_iso].empty else None
+                gdp_data[gdp_data['country_code'].str.lower() == country_iso].empty else None
 
             # Calculate openness index if GDP data is available
             if gdp_value is not None and gdp_value > 0:
@@ -645,13 +645,13 @@ def create_dashboard(
                     'fontFamily': 'Arial, sans-serif',
                     'fontSize': '2.5em',
                     'fontWeight': 'bold',
-                    'textShadow': '2px 2px 4px rgba(0,0,0,0.3)'
+                    'textShadow': '2px 2px 4px rgba(0,0,0,0.3)',
                 }),
             ], style={
                 'background': 'linear-gradient(135deg, #2c3e50, #3498db)',
-                'padding': '20px',
+                'padding': '10px',
                 'boxShadow': '0 4px 6px rgba(0,0,0,0.2)',
-                'borderBottom': '3px solid #2980b9'
+                'borderBottom': '0.5px solid black'
             })
         ], style={'width': '100%'}),
 
@@ -662,34 +662,68 @@ def create_dashboard(
                      style={'width': '100%', 'display': 'flex', 'justifyContent': 'center'},
                      children=[
                          dcc.Tab(label='🌍 Global Network', value='global-network',
-                                 style={'padding': '15px', 'fontSize': '1.1em'}),
+                                 style={
+                                     'textAlign': 'center',
+                                     'color': 'white',
+                                     'fontFamily': 'Arial, sans-serif',
+                                     'fontSize': '1.3em',
+                                     'fontWeight': 'bold',
+                                     'textShadow': '2px 2px 4px rgba(0,0,0,0.3)',
+                                     'padding': '15px'
+                                 }),
                          dcc.Tab(label='🏴 Country Details', value='country-trade',
-                                 style={'padding': '15px', 'fontSize': '1.1em'}),
+                                 style={
+                                     'textAlign': 'center',
+                                     'color': 'white',
+                                     'fontFamily': 'Arial, sans-serif',
+                                     'fontSize': '1.3em',
+                                     'fontWeight': 'bold',
+                                     'textShadow': '2px 2px 4px rgba(0,0,0,0.3)',
+                                     'padding': '15px'
+                                 }),
                          dcc.Tab(label='📊 Trade Metrics', value='trade-metrics',
-                                 style={'padding': '15px', 'fontSize': '1.1em'})
+                                 style={
+                                     'textAlign': 'center',
+                                     'color': 'white',
+                                     'fontFamily': 'Arial, sans-serif',
+                                     'fontSize': '1.3em',
+                                     'fontWeight': 'bold',
+                                     'textShadow': '2px 2px 4px rgba(0,0,0,0.3)',
+                                     'padding': '15px'
+                                 }),
                      ],
                      colors={
                          "border": "#2c3e50",
                          "primary": "#3498db",
-                         "background": "#ecf0f1"
+                         "background": "#84b0d1"
                      }),
 
             # Dynamic content area
             html.Div(id='tabs-content', style={
                 'padding': '20px',
                 'background': 'linear-gradient(to bottom right, #f0f4f8, #e6f2ff)',
-                'minHeight': 'calc(100vh - 200px)'
+                'minHeight': 'calc(100vh - 250px)',  # Increased bottom space
+                'overflowY': 'auto'
+
             })
-        ])
-    ], style={
-        'fontFamily': 'Arial, sans-serif',
-        'margin': '0',
-        'padding': '0',
-        'width': '100vw',
-        'height': '100vh',
-        'overflow': 'hidden',
-        'background': 'linear-gradient(to bottom right, #f0f4f8, #e6f2ff)'
-    })
+        ], style={
+            'height': 'calc(100vh - 100px)',  # Adjusted to allow scrolling
+            'overflowY': 'auto'  # Enable vertical scrolling for entire content
+        })
+    ],
+        style={
+            'textAlign': 'center',
+            'fontFamily': 'Arial, sans-serif',
+            'fontSize': '1 em',
+            'fontWeight': 'bold',
+            'textShadow': '0.5px 0.5px 1px rgba(0,0,0,0.3)',
+            'margin': '0',
+            'padding': '0',
+            'width': '100vw',
+            'height': '100vh',
+            'overflow': 'hidden',
+            'background': 'linear-gradient(to bottom right, #f0f4f8, #e6f2ff)'
+        })
 
     # Callback to render tab content with suppress_callback_exceptions
     @app.callback(
@@ -706,7 +740,13 @@ def create_dashboard(
                 dcc.Graph(
                     id='global-trade-graph',
                     figure=create_trade_visualization(filtered_graph, country_coords, analysis_results),
-                    style={'height': '70vh', 'width': '100%'}
+                    style={
+                        'height': '70vh',
+                        'width': '90%',
+                        'marginLeft': 'auto',
+                        'marginRight': 'auto',
+                        'marginBottom': '40px'
+                    }
                 )
             ])
 
@@ -715,7 +755,8 @@ def create_dashboard(
                 html.H2("Country-Specific Trade Relationships",
                         style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
                 html.Div([
-                    html.Label("Select a Country:", style={'fontWeight': 'bold', 'marginRight': '10px'}),
+                    html.Label("Select a Country:",
+                               style={'fontWeight': 'bold', 'marginRight': '10px', 'fontSize': '0.95 em'}),
                     dcc.Dropdown(
                         id='country-dropdown',
                         options=[{'label': f'{get_flag_emoji(name)} {name}', 'value': id_} for id_, name in countries],
@@ -724,7 +765,15 @@ def create_dashboard(
                     )
                 ], style={'textAlign': 'center', 'marginBottom': '20px'}),
                 dcc.Graph(id='country-trade-graph',
-                          figure=visualize_country_trade(graph, default_country, country_coords, analysis_results))
+                          figure=visualize_country_trade(graph, default_country, country_coords, analysis_results),
+                          style={
+                              'height': '70vh',
+                              'width': '95%',
+                              'marginLeft': 'auto',
+                              'marginRight': 'auto',
+                              'marginBottom': '100px'
+                          }
+                          )
             ])
 
         elif tab == 'trade-metrics':
@@ -746,7 +795,8 @@ def create_dashboard(
                             'display': 'flex',
                             'justifyContent': 'center',
                             'gap': '15px',
-                            'marginBottom': '20px'
+                            'marginBottom': '20px',
+                            'fontSize': '0.95 em'
                         },
                         labelStyle={'cursor': 'pointer'}
                     )
@@ -759,7 +809,14 @@ def create_dashboard(
                         country_coords,
                         '📤 Global Export Volume by Country',
                         gdp_data
-                    )
+                    ),
+                    style={
+                        'height': '70vh',
+                        'width': '95%',
+                        'marginLeft': 'auto',
+                        'marginRight': 'auto',
+                        'marginBottom': '100px'
+                    }
                 )
             ])
 
