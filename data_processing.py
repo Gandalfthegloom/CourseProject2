@@ -43,19 +43,23 @@ def load_trade_data(file_path: str) -> pd.DataFrame:
 def get_country_coordinates() -> pd.DataFrame:
     """Generate a mapping of country IDs to their geographical coordinates.
 
-    This function creates a dictionary mapping each country ID to its latitude and longitude
-    coordinates for visualization on a world map.
+    This function creates a DataFrame mapping each country name to its latitude and longitude
+    coordinates for visualization on a world map. It uses Gapminder's centroids (141 countries)
+    and appends extra coordinates (for the remaining countries from the trade data) from an external JSON file.
 
     Returns:
-        A dictionary mapping country IDs to (latitude, longitude) tuples
+        A DataFrame with columns 'country', 'centroid_lat', and 'centroid_lon'.
     """
-    # Import gapminder for geographic location (centroid coords)
-    gapminder = px.data.gapminder(centroids=True)
+    import plotly.express as px
+    import pandas as pd
+    import os
+    import json
 
-    # Keep only countries and coordinates
+    # Load gapminder centroids
+    gapminder = px.data.gapminder(centroids=True)
     country_centroids = gapminder[['country', 'centroid_lat', 'centroid_lon']].drop_duplicates()
 
-    # Dictionary mapping country names in gapminder to names in the trade dataset
+    # Rename countries to match trade data names, if needed
     country_name_mappings = {
         'Czech Republic': 'Czechia',
         'Slovak Republic': 'Slovakia',
@@ -71,20 +75,23 @@ def get_country_coordinates() -> pd.DataFrame:
         'Yemen, Rep.': 'Yemen'
     }
 
-    # Replace country names in the DataFrame
-    for gapminder_name, trade_name in country_name_mappings.items():
-        # Check if the gapminder name exists in the DataFrame
-        mask = country_centroids['country'] == gapminder_name
+    for gap_name, trade_name in country_name_mappings.items():
+        mask = country_centroids['country'] == gap_name
         if mask.any():
             country_centroids.loc[mask, 'country'] = trade_name
-            print(f"Renamed {gapminder_name} to {trade_name}")
         else:
-            print(f"Warning: {gapminder_name} not found in gapminder dataset")
+            print(f"Warning: {gap_name} not found in gapminder dataset")
 
-    # Reset the index
-    country_centroids = country_centroids.reset_index(drop=True)
+    # Load extra coordinates from the JSON file located in the "Data" folder
+    extra_path = os.path.join(os.path.dirname(__file__), 'Data', 'extra_country_coords.json')
+    with open(extra_path, 'r', encoding='utf-8') as f:
+        extra_coords = json.load(f)
+    extra_df = pd.DataFrame.from_dict(extra_coords, orient='index')
 
-    return country_centroids
+    # Concatenate gapminder data with extra coordinates and drop duplicates
+    full_coords = pd.concat([country_centroids, extra_df], ignore_index=True)
+    full_coords = full_coords.drop_duplicates(subset=['country'], keep='first')
+    return full_coords
 
 
 def filter_by_trade_volume(data: pd.DataFrame, min_value: float) -> pd.DataFrame:
