@@ -104,7 +104,7 @@ def create_trade_visualization(
         # Sort edges for this country by value
         edges.sort(key=lambda x: x[2], reverse=True)
         # Take top 5 or fewer if less than 5 exist
-        top_country_edges = edges[:5]
+        top_country_edges = edges[:100]
         top_edges.extend(top_country_edges)
 
     # Add arrows for each top trade relationship

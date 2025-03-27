@@ -70,8 +70,8 @@ def build_trade_graph(trade_data: pd.DataFrame) -> nx.DiGraph:
     return graph
 
 
-def build_sparse_trade_graph(trade_data: pd.DataFrame, use_disparity_filter: bool = False,
-                             alpha: float = 0.05) -> nx.DiGraph:
+def build_sparse_trade_graph(trade_data: pd.DataFrame, use_disparity_filter: bool = True,
+                             alpha: float = 0.00000000000001) -> nx.DiGraph:
     """
     Constructs a sparse version of the directed graph representing the overview of global trade network.
 
