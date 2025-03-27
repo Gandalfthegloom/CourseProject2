@@ -78,7 +78,7 @@ def build_sparse_trade_graph(trade_data: pd.DataFrame, use_disparity_filter: boo
     Args:
         trade_data: A pandas DataFrame containing the trade data with columns:
                     'exporter_id', 'exporter_name', 'importer_id', 'importer_name', 'value'
-        use_disparity_filter: An option to either use disparity filter or not. Default is True
+        use_disparity_filter: An option to either use disparity filter or not. Default is False
         alpha: The p-value for the disparity filter. Default is 0.05
 
     Returns:
