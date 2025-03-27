@@ -6,16 +6,21 @@ visualization program. It integrates components for data processing, graph build
 analysis, and visualization to create an interactive representation of global trade networks.
 """
 
+# The four libraries below is added just to be safe (although it may look like it has no use)
 import pandas as pd
+import networkx as nx
 import plotly.graph_objects as go
+import dash
 
 import data_processing
-import graph_builder
+from graph_builder import build_trade_graph
 import visualization
 import analysis
 
+TRADE_DATA = 'Data/bilateral_value_clean_23_withid.csv'  # Default data to be used
 
-def run_trade_dashboard() -> None:
+
+def run_trade_dashboard(filename: str = TRADE_DATA) -> None:
     """Run the complete trade visualization dashboard.
 
     This function orchestrates the following steps:
@@ -23,17 +28,20 @@ def run_trade_dashboard() -> None:
     2. Build the trade network graph
     3. Perform network analysis
     4. Launch the integrated dashboard with multiple visualization options
+
+    Preconditions:
+        - filename is a valid CSV file
     """
     # Step 1: Load and process the trade data
     print("Loading and processing trade data...")
-    trade_data = data_processing.load_trade_data('data/bilateral_value_clean_23_withid.csv')
+    trade_data = data_processing.load_trade_data(filename)
     country_coords = data_processing.get_country_coordinates()
     print(f"Loaded trade data for {len(trade_data)} trade relationships")
     print(f"Loaded coordinates for {len(country_coords)} countries")
 
     # Step 2: Build the trade network graph
     print("Building trade network graph...")
-    trade_graph = graph_builder.build_trade_graph(trade_data)
+    trade_graph = build_trade_graph(trade_data)
     print(f"Created graph with {trade_graph.number_of_nodes()} nodes and {trade_graph.number_of_edges()} edges")
 
     # Step 3: Perform network analysis
@@ -46,18 +54,21 @@ def run_trade_dashboard() -> None:
     visualization.create_dashboard(trade_graph, country_coords, analysis_results)
 
 
-def run_simple_visualization() -> None:
+def run_simple_visualization(filename: str = TRADE_DATA) -> None:
     """Run a simple, non-interactive visualization.
 
     This function follows the same steps as run_trade_dashboard but creates
     a static visualization that can be saved or displayed without a web server.
+
+    Preconditions:
+        - filename is a valid CSV file
     """
     # Step 1: Load and process the trade data
-    trade_data = data_processing.load_trade_data('data/bilateral_value_clean_23_withid.csv')
+    trade_data = data_processing.load_trade_data(filename)
     country_coords = data_processing.get_country_coordinates()
 
     # Step 2: Build the trade network graph
-    trade_graph = graph_builder.build_trade_graph(trade_data)
+    trade_graph = build_trade_graph(trade_data)
 
     # Step 3: Perform network analysis
     analysis_results = analysis.analyze_trade_network(trade_graph)
@@ -70,19 +81,22 @@ def run_simple_visualization() -> None:
     print("Visualization complete! You can save this figure using the export button in the top-right corner.")
 
 
-def run_sample_analysis() -> None:
+def run_sample_analysis(filename: str = TRADE_DATA) -> None:
     """Run a sample analysis on the trade data without visualization.
 
     This function demonstrates the core analysis capabilities:
     1. Load and process the trade data
     2. Build the trade network graph
     3. Calculate and display key trade metrics and statistics
+
+    Preconditions:
+        - filename is a valid CSV file
     """
     # Step 1: Load and process the trade data
-    trade_data = data_processing.load_trade_data('data/bilateral_value_clean_23_withid.csv')
+    trade_data = data_processing.load_trade_data(filename)
 
     # Step 2: Build the trade network graph
-    trade_graph = graph_builder.build_trade_graph(trade_data)
+    trade_graph = build_trade_graph(trade_data)
 
     # Step 3: Calculate and display key metrics
     results = analysis.analyze_trade_network(trade_graph)
@@ -104,6 +118,9 @@ def run_sample_analysis() -> None:
 if __name__ == "__main__":
     # Run the integrated dashboard by default
     run_trade_dashboard()
+
+    # Run the integrated dashboard with sample data
+    # run_trade_dashboard('data/sample.csv')
 
     # Alternative running modes (uncomment to use):
     # run_simple_visualization()  # For a simpler, non-interactive visualization

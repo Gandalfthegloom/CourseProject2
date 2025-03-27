@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 import dash
 from dash import dcc, html, Input, Output, callback
-from dash.dependencies import Input, Output
+import random
 
 
 def create_trade_visualization(
@@ -19,16 +19,7 @@ def create_trade_visualization(
         country_coords: pd.DataFrame,
         analysis_results: Dict[str, Any]
 ) -> go.Figure:
-    """Create an interactive visualization of the global trade network.
-
-    Args:
-        graph: The trade network graph
-        country_coords: A DataFrame containing countries and their coordinates
-        analysis_results: The dictionary of analysis results from the analysis module
-
-    Returns:
-        A Plotly Figure object containing the interactive visualization
-    """
+    """Create an interactive visualization of the global trade network."""
     # Create a base world map
     fig = go.Figure()
 
@@ -135,22 +126,24 @@ def create_trade_visualization(
                 f"<b>Trade Flow</b><br>{source_name} → {target_name}<br>Value: ${value:,.2f}"
             )
 
-    # Configure the layout
+    # Configure the layout with a more vibrant background
     fig.update_layout(
         title='Global Trade Network Visualization',
         geo=dict(
             projection_type='natural earth',
             showland=True,
-            landcolor='rgb(243, 243, 243)',
+            landcolor='rgb(240, 248, 255)',  # Light blue background for land
             showcountries=True,
-            countrycolor='rgb(204, 204, 204)',
+            countrycolor='rgb(173, 216, 230)',  # Lighter country borders
             showocean=True,
-            oceancolor='rgb(230, 250, 255)',
+            oceancolor='rgb(230, 250, 255)',  # Softer ocean color
             showlakes=True,
             lakecolor='rgb(220, 240, 255)'
         ),
         height=800,
-        margin=dict(l=0, r=0, t=50, b=0)
+        margin=dict(l=0, r=0, t=50, b=0),
+        paper_bgcolor='rgba(230, 240, 255, 0.5)',  # Very light blue background
+        plot_bgcolor='rgba(230, 240, 255, 0.5)'
     )
 
     return fig
@@ -162,17 +155,7 @@ def visualize_country_trade(
         country_coords: pd.DataFrame,
         analysis_results: Dict[str, Any]
 ) -> go.Figure:
-    """Create a visualization focused on a specific country's trade relationships.
-
-    Args:
-        graph: The trade network graph
-        country_id: The ID of the country to focus on
-        country_coords: A DataFrame containing countries and their coordinates
-        analysis_results: The dictionary of analysis results from the analysis module
-
-    Returns:
-        A Plotly Figure object showing the selected country's trade relationships
-    """
+    """Create a visualization focused on a specific country's trade relationships."""
     # Create a base figure
     fig = go.Figure()
 
@@ -319,17 +302,7 @@ def create_choropleth_map(
         country_coords: pd.DataFrame,
         title: str
 ) -> go.Figure:
-    """Create a choropleth map showing a specific trade metric for each country.
-
-    Args:
-        graph: The trade network graph
-        metric: The metric to visualize ('exports', 'imports', 'balance', 'total')
-        country_coords: A DataFrame containing countries and their coordinates
-        title: The title for the visualization
-
-    Returns:
-        A Plotly Figure object containing the choropleth map
-    """
+    """Create a choropleth map showing a specific trade metric for each country."""
     # Extract values based on the selected metric
     countries = []
     values = []
@@ -415,114 +388,186 @@ def create_dashboard(
         country_coords: pd.DataFrame,
         analysis_results: Dict[str, Any]
 ) -> None:
-    """Create an integrated dashboard with multiple visualization options.
-
-    This function creates and runs a Dash application that allows users to switch
-    between different visualization types and interact with the data.
-
-    Args:
-        graph: The trade network graph
-        country_coords: A DataFrame containing countries and their coordinates
-        analysis_results: The dictionary of analysis results from the analysis module
-    """
+    """Create an integrated dashboard with visualization options."""
     # Create a list of countries for the dropdown
     countries = [(node_id, data['name']) for node_id, data in graph.nodes(data=True)]
     countries.sort(key=lambda x: x[1])  # Sort by country name
 
-    # Create a Dash application
-    app = dash.Dash(__name__, title="Global Trade Network Explorer")
+    # Find the ID for Afghanistan (or first country if Afghanistan not found)
+    default_country = next((id_ for id_, name in countries if name.lower() == 'afghanistan'), countries[0][0])
 
-    # Define app layout
+    # Create a Dash application with full-screen configuration
+    app = dash.Dash(__name__,
+                    title="Global Trade Network Explorer",
+                    external_stylesheets=[
+                        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css'
+                    ])
+
+    # Define the overall app layout with a modern, full-screen design
     app.layout = html.Div([
-        html.H1("Global Trade Network Explorer", style={'textAlign': 'center', 'margin': '20px 0'}),
+        # Full-screen header with gradient and shadow
+        html.Header([
+            html.Div([
+                html.H1([
+                    html.I(className="fas fa-globe-americas", style={'marginRight': '10px'}),
+                    "Global Trade Network Explorer"
+                ], style={
+                    'textAlign': 'center',
+                    'color': 'white',
+                    'fontFamily': 'Arial, sans-serif',
+                    'fontSize': '2.5em',
+                    'fontWeight': 'bold',
+                    'textShadow': '2px 2px 4px rgba(0,0,0,0.3)'
+                }),
+            ], style={
+                'background': 'linear-gradient(135deg, #2c3e50, #3498db)',
+                'padding': '20px',
+                'boxShadow': '0 4px 6px rgba(0,0,0,0.2)',
+                'borderBottom': '3px solid #2980b9'
+            })
+        ], style={'width': '100%'}),
 
-        # Visualization selector
+        # Full-screen content container
         html.Div([
-            html.Label("Select Visualization Type:"),
-            dcc.RadioItems(
-                id='viz-type-selector',
-                options=[
-                    {'label': 'Global Trade Network', 'value': 'global'},
-                    {'label': 'Country Trade Detail', 'value': 'country'},
-                    {'label': 'Trade Metrics Map', 'value': 'metrics'}
-                ],
-                value='global',
-                style={'margin': '10px 0'}
-            )
-        ], style={'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}),
+            # Dynamic tabs with modern styling
+            dcc.Tabs(id='main-tabs', value='global-network',  # Set default value to 'global-network'
+                     style={'width': '100%', 'display': 'flex', 'justifyContent': 'center'},
+                     children=[
+                dcc.Tab(label='🌍 Global Network', value='global-network',
+                        style={'padding': '15px', 'fontSize': '1.1em'}),
+                dcc.Tab(label='🏴 Country Details', value='country-trade',
+                        style={'padding': '15px', 'fontSize': '1.1em'}),
+                dcc.Tab(label='📊 Trade Metrics', value='trade-metrics',
+                        style={'padding': '15px', 'fontSize': '1.1em'})
+            ],
+            colors={
+                "border": "#2c3e50",
+                "primary": "#3498db",
+                "background": "#ecf0f1"
+            }),
 
-        # Country selector (shown only for country view)
-        html.Div([
-            html.Label("Select a Country:"),
-            dcc.Dropdown(
-                id='country-dropdown',
-                options=[{'label': name, 'value': id_} for id_, name in countries],
-                value=countries[0][0]  # Default to first country
-            )
-        ], id='country-selector', style={'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}),
+            # Dynamic content area
+            html.Div(id='tabs-content', style={
+                'padding': '20px',
+                'background': 'linear-gradient(to bottom right, #f0f4f8, #e6f2ff)',
+                'minHeight': 'calc(100vh - 200px)'
+            })
+        ])
+    ], style={
+        'fontFamily': 'Arial, sans-serif',
+        'margin': '0',
+        'padding': '0',
+        'width': '100vw',
+        'height': '100vh',
+        'overflow': 'hidden',
+        'background': 'linear-gradient(to bottom right, #f0f4f8, #e6f2ff)'
+    })
 
-        # Metric selector (shown only for metrics view)
-        html.Div([
-            html.Label("Select Trade Metric:"),
-            dcc.RadioItems(
-                id='metric-selector',
-                options=[
-                    {'label': 'Total Exports', 'value': 'exports'},
-                    {'label': 'Total Imports', 'value': 'imports'},
-                    {'label': 'Trade Balance', 'value': 'balance'},
-                    {'label': 'Total Trade Volume', 'value': 'total'}
-                ],
-                value='exports',
-                style={'margin': '10px 0'}
-            )
-        ], id='metrics-selector', style={'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}),
-
-        # The graph
-        dcc.Graph(id='trade-graph', style={'height': '800px'})
-    ])
-
-    # Show/hide selectors based on visualization type
+    # Callback to render tab content with suppress_callback_exceptions
     @app.callback(
-        [Output('country-selector', 'style'),
-         Output('metrics-selector', 'style')],
-        [Input('viz-type-selector', 'value')]
+        Output('tabs-content', 'children'),
+        [Input('main-tabs', 'value')],
+        prevent_initial_call=False  # Change this to False to load on initial page load
     )
-    def toggle_selectors(viz_type):
-        country_style = {'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}
-        metrics_style = {'padding': '10px', 'backgroundColor': '#f8f9fa', 'borderRadius': '5px', 'margin': '10px'}
+    def render_content(tab):
+        # Wrap each tab's content in a container with consistent styling
+        if tab == 'global-network':
+            return html.Div([
+                html.H2("Global Trade Network Overview",
+                        style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
+                dcc.Graph(
+                    id='global-trade-graph',
+                    figure=create_trade_visualization(graph, country_coords, analysis_results),
+                    style={'height': '70vh', 'width': '100%'}
+                )
+            ])
 
-        if viz_type == 'country':
-            metrics_style['display'] = 'none'
-        elif viz_type == 'metrics':
-            country_style['display'] = 'none'
-        else:  # global
-            country_style['display'] = 'none'
-            metrics_style['display'] = 'none'
+        elif tab == 'country-trade':
+            return html.Div([
+                html.H2("Country-Specific Trade Relationships",
+                        style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
+                html.Div([
+                    html.Label("Select a Country:", style={'fontWeight': 'bold', 'marginRight': '10px'}),
+                    dcc.Dropdown(
+                        id='country-dropdown',
+                        options=[{'label': f'{get_flag_emoji(name)} {name}', 'value': id_} for id_, name in countries],
+                        value=default_country,  # Set default to Afghanistan or first country
+                        style={'width': '50%', 'margin': '0 auto'}
+                    )
+                ], style={'textAlign': 'center', 'marginBottom': '20px'}),
+                dcc.Graph(id='country-trade-graph',
+                          figure=visualize_country_trade(graph, default_country, country_coords, analysis_results))
+            ])
 
-        return country_style, metrics_style
+        elif tab == 'trade-metrics':
+            return html.Div([
+                html.H2("Global Trade Metrics",
+                        style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
+                html.Div([
+                    dcc.RadioItems(
+                        id='metric-selector',
+                        options=[
+                            {'label': '📤 Total Exports', 'value': 'exports'},
+                            {'label': '📥 Total Imports', 'value': 'imports'},
+                            {'label': '⚖️ Trade Balance', 'value': 'balance'},
+                            {'label': '💱 Total Trade Volume', 'value': 'total'}
+                        ],
+                        value='exports',  # Set default to total exports
+                        style={
+                            'display': 'flex',
+                            'justifyContent': 'center',
+                            'gap': '15px',
+                            'marginBottom': '20px'
+                        },
+                        labelStyle={'cursor': 'pointer'}
+                    )
+                ]),
+                dcc.Graph(
+                    id='trade-metrics-graph',
+                    figure=create_choropleth_map(
+                        graph,
+                        'exports',
+                        country_coords,
+                        '📤 Global Export Volume by Country'
+                    )
+                )
+            ])
 
-    # Update the graph based on selections
+    # Callback for country trade graph
     @app.callback(
-        Output('trade-graph', 'figure'),
-        [Input('viz-type-selector', 'value'),
-         Input('country-dropdown', 'value'),
-         Input('metric-selector', 'value')]
+        Output('country-trade-graph', 'figure'),
+        [Input('country-dropdown', 'value')],
+        prevent_initial_call=True
     )
-    def update_graph(viz_type, selected_country, selected_metric):
-        if viz_type == 'global':
-            return create_trade_visualization(graph, country_coords, analysis_results)
-        elif viz_type == 'country':
-            return visualize_country_trade(graph, selected_country, country_coords, analysis_results)
-        elif viz_type == 'metrics':
-            titles = {
-                'exports': 'Global Export Volume by Country',
-                'imports': 'Global Import Volume by Country',
-                'balance': 'Trade Balance by Country',
-                'total': 'Total Trade Volume by Country'
-            }
-            return create_choropleth_map(graph, selected_metric, country_coords, titles[selected_metric])
+    def update_country_trade_graph(selected_country):
+        """Update the graph for a specific country's trade details."""
+        return visualize_country_trade(graph, selected_country, country_coords, analysis_results)
 
-    print("Starting dashboard. Navigate to http://127.0.0.1:8050/ to view the application.")
+    # Callback for trade metrics graph
+    @app.callback(
+        Output('trade-metrics-graph', 'figure'),
+        [Input('metric-selector', 'value')],
+        prevent_initial_call=True
+    )
+    def update_trade_metrics_graph(selected_metric):
+        """Update the trade metrics graph based on selected metric."""
+        titles = {
+            'exports': '📤 Global Export Volume by Country',
+            'imports': '📥 Global Import Volume by Country',
+            'balance': '⚖️ Trade Balance by Country',
+            'total': '💱 Total Trade Volume by Country'
+        }
+        return create_choropleth_map(
+            graph,
+            selected_metric,
+            country_coords,
+            titles[selected_metric]
+        )
+
+    # Configure the app to enable callback exceptions
+    app.config.suppress_callback_exceptions = True
+
+    print("Starting trade dashboard! Navigate to http://127.0.0.1:8050/ to explore global trade!")
     app.run(debug=True)
 
 
@@ -536,16 +581,7 @@ def plot_trade_arrow(
         color: str,
         hover_text: str
 ) -> None:
-    """Add a directional arrow representing a trade relationship to the map.
-
-    Args:
-        fig: The Plotly Figure to add the arrow to
-        start_lat, start_lon: Coordinates of the exporting country
-        end_lat, end_lon: Coordinates of the importing country
-        weight: The trade value, used to determine arrow thickness
-        color: The color of the arrow
-        hover_text: Text to display when hovering over the arrow
-    """
+    """Add a directional arrow representing a trade relationship to the map."""
     # Use a great circle path for the trade flow
     # This creates a curved line that follows the earth's curvature
 
@@ -554,17 +590,17 @@ def plot_trade_arrow(
     lat_path = np.linspace(start_lat, end_lat, n_points)
     lon_path = np.linspace(start_lon, end_lon, n_points)
 
-    # Add slight curve to make the path visually appealing
-    # (This is a simple approximation, not a true great circle)
+    # Add slight curve to the path
     mid_index = n_points // 2
-    curve_factor = 0.2  # How much to curve the path
+    # Curve factor determines how much the path bends
+    curve_factor = 0.2
 
     # Calculate angle perpendicular to the direct path
     angle = np.arctan2(end_lat - start_lat, end_lon - start_lon) + np.pi / 2
 
-    # Apply the curve
+    # Apply curve
     for i in range(1, n_points - 1):
-        # Scale factor peaks at the middle of the path
+        # Scale of curve reduces towards path ends
         scale = curve_factor * np.sin(np.pi * i / n_points)
         lat_path[i] += scale * np.sin(angle)
         lon_path[i] += scale * np.cos(angle)
@@ -584,16 +620,12 @@ def plot_trade_arrow(
     ))
 
     # Add an arrowhead at the end of the path
-    # We'll use the second-to-last point to determine the direction
-    arrow_lat = lat_path[-2:].tolist()
-    arrow_lon = lon_path[-2:].tolist()
-
     fig.add_trace(go.Scattergeo(
-        lon=arrow_lon,
-        lat=arrow_lat,
+        lon=lon_path[-2:],
+        lat=lat_path[-2:],
         mode='lines',
         line=dict(
-            width=weight * 1.5,  # Make the arrowhead slightly thicker
+            width=weight * 1.5,  # Make arrowhead slightly thicker
             color=color
         ),
         hoverinfo='text',
@@ -602,13 +634,25 @@ def plot_trade_arrow(
     ))
 
 
+def get_flag_emoji(country_name):
+    """Generate a flag emoji for a given country name."""
+    flag_emojis = {
+        'United States': '🇺🇸', 'China': '🇨🇳', 'Japan': '🇯🇵',
+        'Germany': '🇩🇪', 'United Kingdom': '🇬🇧', 'France': '🇫🇷',
+        'India': '🇮🇳', 'Brazil': '🇧🇷', 'Italy': '🇮🇹',
+        'Canada': '🇨🇦', 'Russia': '🇷🇺', 'South Korea': '🇰🇷',
+        # Add more countries as needed
+    }
+    return flag_emojis.get(country_name, '🌍')  # Default to globe if no flag found
+
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
 
     import python_ta
     python_ta.check_all(config={
-        'extra-imports': ['pandas', 'networkx', 'plotly.graph_objects', 'typing', 'numpy', 'dash'],
+        'extra-imports': ['pandas', 'networkx', 'plotly.graph_objects', 'typing', 'numpy', 'dash', 'random'],
         'allowed-io': ['create_dashboard'],
         'max-line-length': 100,
         'disable': ['R1705', 'C0200']
