@@ -302,138 +302,164 @@ def create_choropleth_map(
         country_coords: pd.DataFrame,
         title: str
 ) -> go.Figure:
-    """Create a choropleth map showing a specific trade metric for each country."""
-    # Extract values based on the selected metric
-    countries = []
-    values = []
-    texts = []
-    lats = []
-    lons = []
+    """Create a hybrid choropleth-scatter map showing trade metrics for all countries.
 
+    This function uses a choropleth for standard countries and scatter points for
+    territories that aren't recognized by Plotly's choropleth.
+
+    Args:
+        graph: NetworkX DiGraph containing trade data
+        metric: Which trade metric to visualize ('exports', 'imports', 'balance', or 'total')
+        country_coords: DataFrame with country coordinates
+        title: Title for the visualization
+
+    Returns:
+        A Plotly figure object with the visualization
+    """
     # Create a mapping of country names to coordinates
     country_coord_map = dict(zip(country_coords['country'],
                                  zip(country_coords['centroid_lat'], country_coords['centroid_lon'])))
 
-    # Collect values
-    metric_values = []
-    for node_id, data in graph.nodes(data=True):
-        country_name = data['name']
+    # Define list of territories that should be displayed as scatter points
+    # These are territories that Plotly's choropleth doesn't recognize
+    non_standard_territories = {
+        'Hong Kong', 'Macau', 'Chinese Taipei', 'Puerto Rico', 'Palestine',
+        'Reunion', 'Aruba', 'Anguilla', 'Bonaire', 'Curaçao', 'Montserrat',
+        'Wallis and Futuna', 'Tokelau', 'British Virgin Islands',
+        'French South Antarctic Territory', 'Saint Barthélemy', 'Cocos (Keeling) Islands',
+        'Christmas Island', 'Northern Mariana Islands', 'Norfolk Island',
+        'Pitcairn Islands', 'Saint Martin', 'Saint Pierre and Miquelon'
+        # Add more as you identify them
+    }
 
-        if country_name in country_coord_map:
-            # Determine the value based on the selected metric
-            if metric == 'exports':
-                value = data['total_exports']
-            elif metric == 'imports':
-                value = data['total_imports']
-            elif metric == 'balance':
-                value = data['total_exports'] - data['total_imports']
-            else:  # 'total'
-                value = data['total_exports'] + data['total_imports']
+    # Country name mapping to match Plotly's expected names
+    country_name_mapping = {
+        'United States': 'USA',
+        'United Kingdom': 'UK',
+        'Burma': 'Myanmar',
+        'Czechia': 'Czech Republic',
+        'Republic of the Congo': 'Congo',
+        'Democratic Republic of the Congo': 'Democratic Republic of Congo',
+        "Cote d'Ivoire": 'Ivory Coast',
+        'Eswatini': 'Swaziland',
+        'North Macedonia': 'Macedonia',
+        'Timor-Leste': 'East Timor',
+        'Cape Verde': 'Cabo Verde',
+        'Saint Vincent and the Grenadines': 'St. Vincent and the Grenadines',
+        'Saint Kitts and Nevis': 'St. Kitts and Nevis',
+        'Saint Lucia': 'St. Lucia',
+        'Antigua and Barbuda': 'Antigua',
+        'Trinidad and Tobago': 'Trinidad',
+        'Bosnia and Herzegovina': 'Bosnia'
+    }
 
-            metric_values.append(value)
+    # Create dictionaries to store standard and non-standard country data
+    standard_countries = []
+    standard_values = []
+    standard_texts = []
 
-    # Custom color mapping based on trade balance
-    def get_color_scale(value):
-        if metric == 'balance':
-            # For trade balance, use blue to red scale
-            if value > 0:
-                # Positive balance (blue scale)
-                if value < 0.5e12:  # Less than 0.5 trillion
-                    return '#e0f3f8'  # Very Light Blue
-                elif value < 1e12:  # 0.5-1 trillion
-                    return '#91bfdb'  # Light Blue
-                elif value < 2e12:  # 1-2 trillion
-                    return '#4575b4'  # Medium Blue
-                else:  # Over 2 trillion
-                    return '#313695'  # Dark Blue
-            else:
-                # Negative balance (red scale)
-                if value > -0.5e12:  # Greater than -0.5 trillion
-                    return '#fee5d9'  # Very Light Red
-                elif value > -1e12:  # -0.5 to -1 trillion
-                    return '#fcae91'  # Light Red
-                elif value > -2e12:  # -1 to -2 trillion
-                    return '#fb6a4a'  # Medium Red
-                else:  # Less than -2 trillion
-                    return '#de2d26'  # Dark Red
-        else:
-            # For other metrics, use blue scale
-            if value < 1e12:  # Less than 1 trillion
-                return '#e0f3f8'  # Very Light Blue
-            elif value < 2e12:  # 1-2 trillion
-                return '#91bfdb'  # Light Blue
-            elif value < 3e12:  # 2-3 trillion
-                return '#4575b4'  # Medium Blue
-            elif value < 4e12:  # 3-4 trillion
-                return '#313695'  # Dark Blue
-            else:  # Over 4 trillion
-                return '#081d58'  # Very Dark Blue
+    nonstandard_countries = []
+    nonstandard_values = []
+    nonstandard_texts = []
+    nonstandard_lats = []
+    nonstandard_lons = []
 
-    # Create color scale for the visualization
+    # Set up the color scale based on metric
     if metric == 'balance':
-        color_scale = [
-            [0, '#de2d26'],  # Darkest Red (large negative)
-            [0.25, '#fb6a4a'],  # Medium Red
-            [0.5, '#ffffff'],  # White (neutral)
-            [0.75, '#4575b4'],  # Medium Blue
-            [1, '#313695']  # Darkest Blue (large positive)
-        ]
-        # Determine appropriate tick values and labels
-        tick_values = [-2e12, -1e12, -0.5e12, 0, 0.5e12, 1e12, 2e12]
-        tick_texts = [
-            '-$2T', '-$1T', '-$0.5T', '$0',
-            '$0.5T', '$1T', '$2T'
-        ]
+        color_scale = 'RdBu'  # Red-Blue for negative-positive values
     else:
-        color_scale = [
-            [0, '#e0f3f8'],  # < 1T
-            [0.25, '#91bfdb'],  # 1-2T
-            [0.5, '#4575b4'],  # 2-3T
-            [0.75, '#313695'],  # 3-4T
-            [1, '#081d58']  # > 4T
-        ]
-        # Use previous tick values for other metrics
-        tick_values = [1e12, 2e12, 3e12, 4e12, max(values) if values else 4e12]
-        tick_texts = ['$1T', '$2T', '$3T', '$4T', f'${max(values) / 1e12:.1f}T' if values else '$4T']
+        color_scale = 'Blues'  # Blues for other metrics
 
+    # Process each country in the graph
     for node_id, data in graph.nodes(data=True):
         country_name = data['name']
 
-        if country_name in country_coord_map:
-            lat, lon = country_coord_map[country_name]
+        # Determine the value based on the selected metric
+        if metric == 'exports':
+            value = data['total_exports']
+            text = f"<b>{country_name}</b><br>Total Exports: ${value:,.2f}"
+        elif metric == 'imports':
+            value = data['total_imports']
+            text = f"<b>{country_name}</b><br>Total Imports: ${value:,.2f}"
+        elif metric == 'balance':
+            # Calculate trade balance ratio instead of absolute value
+            trade_balance = data['total_exports'] - data['total_imports']
+            total_trade = data['total_exports'] + data['total_imports']
 
-            # Determine the value based on the selected metric
-            if metric == 'exports':
-                value = data['total_exports']
-                text = f"<b>{country_name}</b><br>Total Exports: ${value:,.2f}"
-            elif metric == 'imports':
-                value = data['total_imports']
-                text = f"<b>{country_name}</b><br>Total Imports: ${value:,.2f}"
-            elif metric == 'balance':
-                value = data['total_exports'] - data['total_imports']
-                text = f"<b>{country_name}</b><br>Trade Balance: ${value:,.2f}"
-            else:  # 'total'
-                value = data['total_exports'] + data['total_imports']
-                text = f"<b>{country_name}</b><br>Total Trade: ${value:,.2f}"
+            # Normalize between -1 and 1 for coloring
+            if total_trade > 0:
+                value = trade_balance / total_trade  # This will be between -1 and 1
+            else:
+                value = 0
 
-            countries.append(country_name)
-            values.append(value)
-            texts.append(text)
-            lats.append(lat)
-            lons.append(lon)
+            text = (f"<b>{country_name}</b><br>"
+                    f"Trade Balance: ${trade_balance:,.2f}<br>"
+                    f"Total Trade: ${total_trade:,.2f}<br>"
+                    f"Balance Ratio: {value:.2%}")
+        else:  # 'total'
+            value = data['total_exports'] + data['total_imports']
+            text = f"<b>{country_name}</b><br>Total Trade: ${value:,.2f}"
 
-    # Create a figure with bubbles on a map
-    fig = go.Figure(data=go.Scattergeo(
-        lon=lons,
-        lat=lats,
-        text=texts,
-        mode='markers',
-        marker=dict(
-            # Adjusted size scaling to be more linear
-            size=np.log1p(np.abs(values)) * 3,
-            # Custom color mapping
-            color=values,
+        # Check if this is a non-standard territory or not in our coordinate map
+        if country_name in non_standard_territories or country_name not in country_coord_map:
+            # Only add if we have coordinates for it
+            if country_name in country_coord_map:
+                lat, lon = country_coord_map[country_name]
+                nonstandard_countries.append(country_name)
+                nonstandard_values.append(value)
+                nonstandard_texts.append(text)
+                nonstandard_lats.append(lat)
+                nonstandard_lons.append(lon)
+        else:
+            # Standard country for choropleth
+            location_name = country_name_mapping.get(country_name, country_name)
+            standard_countries.append(location_name)
+            standard_values.append(value)
+            standard_texts.append(text)
+
+    # Create the figure
+    fig = go.Figure()
+
+    # Get color scale configuration
+    if metric == 'balance':
+        # For balance, we want a diverging scale centered at 0
+        max_abs_value = max(
+            abs(min(standard_values + nonstandard_values, default=0)),
+            abs(max(standard_values + nonstandard_values, default=0))
+        )
+        zmin = -max_abs_value
+        zmax = max_abs_value
+
+        # Balance-specific tick formatting
+        tick_values = [-2e12, -1e12, -0.5e12, 0, 0.5e12, 1e12, 2e12]
+        tick_texts = ['-$2T', '-$1T', '-$0.5T', '$0', '$0.5T', '$1T', '$2T']
+    else:
+        # For other metrics, we want a sequential scale starting at 0
+        zmin = 0
+        zmax = max(standard_values + nonstandard_values, default=4e12)
+
+        # Linear scale tick formatting
+        max_value = max(standard_values + nonstandard_values, default=4e12)
+        tick_values = [0, 1e12, 2e12, 3e12, 4e12]
+        tick_texts = ['$0', '$1T', '$2T', '$3T', '$4T']
+
+        # Add a tick for maximum value if it's beyond our standard ticks
+        if max_value > 4e12:
+            tick_values.append(max_value)
+            tick_texts.append(f'${max_value / 1e12:.1f}T')
+
+    # PART 1: Add choropleth for standard countries
+    if standard_countries:
+        fig.add_trace(go.Choropleth(
+            locations=standard_countries,
+            locationmode='country names',
+            z=standard_values,
+            text=standard_texts,
             colorscale=color_scale,
+            zmin=zmin,
+            zmax=zmax,
+            marker_line_color='darkgray',
+            marker_line_width=0.5,
             colorbar=dict(
                 title=f'{metric.capitalize()} (USD)',
                 thicknessmode='pixels',
@@ -447,17 +473,61 @@ def create_choropleth_map(
                 tickvals=tick_values,
                 ticktext=tick_texts
             ),
-            showscale=True,
-            line=dict(width=1, color='black')
-        ),
-        hoverinfo='text',
-        name=f'{metric.capitalize()} by Country'
-    ))
+            hoverinfo='text',
+            name='Countries'
+        ))
+
+    # PART 2: Add scatter points for non-standard territories
+    if nonstandard_lats:
+        # Calculate node size based on value
+        # Using log scale to handle wide range of values
+        node_sizes = [max(7, 5 + (abs(val) / 1e9) ** 0.5) for val in nonstandard_values]
+
+        # For balance metric, we need to handle negative values differently for color
+        if metric == 'balance':
+            # Normalize between -1 and 1 for coloring
+            node_colors = []
+            for val in nonstandard_values:
+                if val > 0:
+                    # Positive is blue (1)
+                    normalized = min(1, val / max_abs_value)
+                else:
+                    # Negative is red (-1)
+                    normalized = max(-1, val / max_abs_value)
+                node_colors.append(normalized)
+
+            scatter_colorscale = 'RdBu'
+            scatter_cmin = -1
+            scatter_cmax = 1
+        else:
+            # For exports, imports, total - just normalize from 0 to max
+            node_colors = [val / zmax for val in nonstandard_values]
+            scatter_colorscale = 'Blues'
+            scatter_cmin = 0
+            scatter_cmax = 1
+
+        fig.add_trace(go.Scattergeo(
+            lon=nonstandard_lons,
+            lat=nonstandard_lats,
+            text=nonstandard_texts,
+            mode='markers',
+            marker=dict(
+                size=node_sizes,
+                color=node_colors,
+                colorscale=scatter_colorscale,
+                cmin=scatter_cmin,
+                cmax=scatter_cmax,
+                line=dict(width=1, color='black')
+            ),
+            hoverinfo='text',
+            name='Special Territories'
+        ))
 
     # Configure the layout
     fig.update_layout(
         title=title,
         geo=dict(
+            showframe=False,
             projection_type='natural earth',
             showland=True,
             landcolor='rgb(243, 243, 243)',
@@ -469,10 +539,12 @@ def create_choropleth_map(
             lakecolor='rgb(220, 240, 255)'
         ),
         height=900,
-        margin=dict(l=0, r=150, t=50, b=100)
+        margin=dict(l=0, r=150, t=50, b=100),
+        legend_title_text='Territory Type'
     )
 
     return fig
+
 
 def create_dashboard(
         graph: nx.DiGraph,
