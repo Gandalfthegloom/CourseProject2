@@ -41,7 +41,7 @@ def create_trade_visualization(
 
             # Calculate node size based on total trade volume
             total_trade = data['total_exports'] + data['total_imports']
-            node_size = 7 + (total_trade / 1e9) ** 0.49  # Log scale to handle wide range of values
+            node_size = 7 + (total_trade / 1e9) ** 0.49  # Hybrid scaling
 
             # Calculate node color based on trade balance
             trade_balance = data['total_exports'] - data['total_imports']
@@ -378,7 +378,7 @@ def create_choropleth_map(
     elif metric == 'openness':
         color_scale = 'Viridis'  # A different color scale for openness
     else:
-        color_scale = 'Blues'  # Blues for other metrics
+        color_scale = 'oxy'  # Blues for other metrics
 
     # Process each country in the graph
     for node_id, data in graph.nodes(data=True):
@@ -412,7 +412,7 @@ def create_choropleth_map(
             value = data['total_imports']
             text = f"<b>{country_name}</b><br>Total Imports: ${value:,.2f}"
         elif metric == 'balance':
-            # Calculate trade balance ratio instead of absolute value
+            # Calculate trade balance ratio ==
             trade_balance = data['total_exports'] - data['total_imports']
             total_trade = data['total_exports'] + data['total_imports']
 
@@ -472,19 +472,38 @@ def create_choropleth_map(
         tick_values = [0, 25, 50, 75, 100, 125, 150]
         tick_texts = ['0%', '25%', '50%', '75%', '100%', '125%', '150%']
     else:
-        # For other metrics, we want a sequential scale starting at 0
-        zmin = 0
-        zmax = max(standard_values + nonstandard_values, default=4e12)
+        # For exports, imports, and total metrics, use logarithmic scaling
+        # Add a small constant to handle zero values before taking log
+        constant = 1e6  # $1 million, to avoid log(0) issues
 
-        # Linear scale tick formatting
+        # Apply logarithmic transformation to standard values
+        if standard_values:
+            log_standard_values = [np.log10(val + constant) if val > 0 else 0 for val in standard_values]
+        else:
+            log_standard_values = []
+
+        # Apply logarithmic transformation to non-standard values
+        if nonstandard_values:
+            log_nonstandard_values = [np.log10(val + constant) if val > 0 else 0 for val in nonstandard_values]
+        else:
+            log_nonstandard_values = []
+
+        # Set range from 0 to max of log values
+        zmin = np.log10(constant)  # Log of the constant we added
+        max_log_value = max(log_standard_values + log_nonstandard_values, default=np.log10(4e12))
+        zmax = max_log_value
+
+        # Create logarithmic tick values that represent intuitive dollar amounts
         max_value = max(standard_values + nonstandard_values, default=4e12)
-        tick_values = [0, 1e12, 2e12, 3e12, 4e12]
-        tick_texts = ['$0', '$1T', '$2T', '$3T', '$4T']
 
-        # Add a tick for maximum value if it's beyond our standard ticks
-        if max_value > 4e12:
-            tick_values.append(max_value)
-            tick_texts.append(f'${max_value / 1e12:.1f}T')
+        # Create tick marks at powers of 10
+        magnitude = int(np.log10(max_value))
+        tick_values = [np.log10(10 ** i + constant) for i in range(7, magnitude + 2)]
+        tick_texts = ['$10M', '$100M', '$1B', '$10B', '$100B', '$1T', '$10T'][:magnitude - 5]
+
+        # Replace the values in the data with their log versions for plotting
+        standard_values = log_standard_values
+        nonstandard_values = log_nonstandard_values
 
     # PART 1: Add choropleth for standard countries
     if standard_countries:
@@ -546,7 +565,7 @@ def create_choropleth_map(
         else:
             # For exports, imports, total - just normalize from 0 to max
             node_colors = [val / zmax for val in nonstandard_values]
-            scatter_colorscale = 'Blues'
+            scatter_colorscale = 'oxy'
             scatter_cmin = 0
             scatter_cmax = 1
 
@@ -591,6 +610,7 @@ def create_choropleth_map(
 
 
 def create_dashboard(
+        filtered_graph: nx.DiGraph,
         graph: nx.DiGraph,
         country_coords: pd.DataFrame,
         analysis_results: Dict[str, Any],
@@ -598,7 +618,7 @@ def create_dashboard(
 ) -> None:
     """Create an integrated dashboard with visualization options."""
     # Create a list of countries for the dropdown
-    countries = [(node_id, data['name']) for node_id, data in graph.nodes(data=True)]
+    countries = [(node_id, data['name']) for node_id, data in filtered_graph.nodes(data=True)]
     countries.sort(key=lambda x: x[1])  # Sort by country name
 
     # Find the ID for Afghanistan (or first country if Afghanistan not found)
@@ -685,7 +705,7 @@ def create_dashboard(
                         style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
                 dcc.Graph(
                     id='global-trade-graph',
-                    figure=create_trade_visualization(graph, country_coords, analysis_results),
+                    figure=create_trade_visualization(filtered_graph, country_coords, analysis_results),
                     style={'height': '70vh', 'width': '100%'}
                 )
             ])
@@ -734,7 +754,7 @@ def create_dashboard(
                 dcc.Graph(
                     id='trade-metrics-graph',
                     figure=create_choropleth_map(
-                        graph,
+                        filtered_graph,
                         'exports',
                         country_coords,
                         '📤 Global Export Volume by Country',
@@ -769,7 +789,7 @@ def create_dashboard(
             'openness': '🔄 Trade Openness Index by Country'
         }
         return create_choropleth_map(
-            graph,
+            filtered_graph,
             selected_metric,
             country_coords,
             titles[selected_metric],

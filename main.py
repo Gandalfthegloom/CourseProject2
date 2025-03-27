@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 import dash
 
 import data_processing
-from graph_builder import build_trade_graph
+from graph_builder import build_sparse_trade_graph, build_trade_graph
 import visualization
 import analysis
 
@@ -47,6 +47,7 @@ def run_trade_dashboard(filename: str = TRADE_DATA, gdp: str = GDP_DATA) -> None
     # Step 2: Build the trade network graph
     print("Building trade network graph...")
     trade_graph = build_trade_graph(trade_data)
+    filtered_trade_graph = build_sparse_trade_graph(trade_data)
     print(f"Created graph with {trade_graph.number_of_nodes()} nodes and {trade_graph.number_of_edges()} edges")
 
     # Step 3: Perform network analysis
@@ -56,7 +57,7 @@ def run_trade_dashboard(filename: str = TRADE_DATA, gdp: str = GDP_DATA) -> None
 
     # Step 4: Launch the integrated dashboard
     print("Launching visualization dashboard...")
-    visualization.create_dashboard(trade_graph, country_coords, analysis_results, gdp_data)
+    visualization.create_dashboard(filtered_trade_graph, trade_graph, country_coords, analysis_results, gdp_data)
 
 
 def run_simple_visualization(filename: str = TRADE_DATA) -> None:
