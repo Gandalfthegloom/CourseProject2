@@ -704,7 +704,6 @@ def create_dashboard(
                 'background': 'linear-gradient(to bottom right, #f0f4f8, #e6f2ff)',
                 'minHeight': 'calc(100vh - 250px)',  # Increased bottom space
                 'overflowY': 'auto'
-
             })
         ], style={
             'height': 'calc(100vh - 100px)',  # Adjusted to allow scrolling
@@ -745,7 +744,7 @@ def create_dashboard(
                         'width': '90%',
                         'marginLeft': 'auto',
                         'marginRight': 'auto',
-                        'marginBottom': '40px'
+                        'marginBottom': '100px'
                     }
                 )
             ])
@@ -810,13 +809,15 @@ def create_dashboard(
                         '📤 Global Export Volume by Country',
                         gdp_data
                     ),
+
                     style={
                         'height': '70vh',
-                        'width': '95%',
+                        'width': '90%',
                         'marginLeft': 'auto',
                         'marginRight': 'auto',
                         'marginBottom': '100px'
                     }
+
                 )
             ])
 
