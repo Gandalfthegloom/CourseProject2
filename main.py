@@ -6,12 +6,6 @@ visualization program. It integrates components for data processing, graph build
 analysis, and visualization to create an interactive representation of global trade networks.
 """
 
-# The four libraries below is added just to be safe (although it may look like it has no use)
-import pandas as pd
-import networkx as nx
-import plotly.graph_objects as go
-import dash
-
 import data_processing
 from graph_builder import build_sparse_trade_graph, build_trade_graph
 import visualization
@@ -32,6 +26,7 @@ def run_trade_dashboard(filename: str = TRADE_DATA, gdp: str = GDP_DATA) -> None
 
     Preconditions:
         - filename is a valid CSV file
+        - gdp is a valid CSV file
     """
     # Step 1: Load and process the trade data
     print("Loading and processing trade data...")
@@ -75,14 +70,13 @@ def run_simple_visualization(filename: str = TRADE_DATA) -> None:
 
     # Step 2: Build the trade network graph
     trade_graph = build_trade_graph(trade_data)
-    filtered_trade_graph = build_sparse_trade_graph(trade_data)
 
     # Step 3: Perform network analysis
     analysis_results = analysis.analyze_trade_network(trade_graph)
 
     # Step 4: Create a static visualization
     print("Creating visualization...")
-    viz = visualization.create_community_visualization(filtered_trade_graph, country_coords, analysis_results)
+    viz = visualization.create_trade_visualization(trade_graph, country_coords, analysis_results)
     viz.show()  # Display the visualization
 
     print("Visualization complete! You can save this figure using the export button in the top-right corner.")
@@ -117,18 +111,18 @@ def run_sample_analysis(filename: str = TRADE_DATA) -> None:
     for country, value in results['top_importers'][:10]:
         print(f"{country}: ${value:,.2f}")
 
-    print("\n=== Most Interdependent Country Pairs ===")
+    print("\n=== 10 Most Interdependent Country Pairs ===")
     for country1, country2, value in results['strongest_relationships'][:10]:
         print(f"{country1} - {country2}: ${value:,.2f}")
 
 
 if __name__ == "__main__":
     # Run the integrated dashboard by default
-    # run_trade_dashboard()
+    run_trade_dashboard()
 
     # Run the integrated dashboard with sample data
     # run_trade_dashboard('data/sample.csv')
 
     # Alternative running modes (uncomment to use):
-    run_simple_visualization()  # For a simpler, non-interactive visualization
+    # run_simple_visualization()  # For a simpler, non-interactive visualization
     # run_sample_analysis()       # For analysis without visualization

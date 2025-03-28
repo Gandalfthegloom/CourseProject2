@@ -4,11 +4,10 @@ This module contains functions for loading and processing the preprocessed trade
 It handles the cleaning, filtering, and preparation of data for graph construction.
 """
 
-from typing import Dict, Any, List, Tuple
-import pandas as pd
-import plotly.express as px
 import os
 import json
+import pandas as pd
+import plotly.express as px
 
 
 def load_trade_data(file_path: str) -> pd.DataFrame:
@@ -186,10 +185,10 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
 
-    # import python_ta
-    # python_ta.check_all(config={
-    #     'extra-imports': ['pandas', 'typing'],
-    #     'allowed-io': ['load_trade_data'],
-    #     'max-line-length': 100,
-    #     'disable': ['R1705', 'C0200']
-    # })
+    import python_ta
+    python_ta.check_all(config={
+        'extra-imports': ['pandas', 'plotly.express', 'os', 'json'],
+        "forbidden-io-functions": [],
+        'max-line-length': 120,
+        'disable': ['R1705', 'C0200']
+    })

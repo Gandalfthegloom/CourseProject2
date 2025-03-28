@@ -199,7 +199,7 @@ def create_community_visualization(
     unique_communities = set(communities.values())
     num_communities = len(unique_communities)
 
-    # Create a color map for communities - for max 5 communities
+    # Create a color map for communities - using a colorful scale
     community_colors = {}
     colorscales = ['Viridis', 'Plasma', 'Inferno', 'Magma', 'Cividis']
     chosen_scale = colorscales[0]  # Default to Viridis
@@ -242,7 +242,7 @@ def create_community_visualization(
             # Prepare hover text
             hover_text = (
                 f"<b>{country_name}</b><br>"
-                f"Community: {community_id + 1}<br>"
+                f"Community: {community_id}<br>"
                 f"Total Exports: ${data['total_exports']:,.2f}<br>"
                 f"Total Imports: ${data['total_imports']:,.2f}<br>"
                 f"Trade Balance: ${data['total_exports'] - data['total_imports']:,.2f}<br>"
@@ -1634,6 +1634,11 @@ def create_dashboard(
     )
     def update_country_trade_graph(selected_country):
         """Update the graph for a specific country's trade details."""
+        # If no country is selected (selected_country is None or empty), don't update the graph
+        if selected_country is None or selected_country == '':
+            # Return the current figure (you can track the current figure in a global variable or use a placeholder)
+            return dash.no_update
+
         return visualize_country_trade(graph, selected_country, country_coords, analysis_results)
 
     # Callback for trade metrics graph
@@ -1665,10 +1670,10 @@ def create_dashboard(
         prevent_initial_call=False
     )
     def update_country_dependency_tables(selected_country):
-        '''Update the dependency metrics tables based on the selected country.'''
+        """Update the dependency metrics tables based on the selected country."""
         if not selected_country:
-            # If no country is selected (shouldn't happen with default value set)
-            return html.Div("Please select a country to view its trade metrics.")
+            # If no country is selected
+            return dash.no_update
 
         # Get country name
         country_name = graph.nodes[selected_country]['name'] if selected_country in graph.nodes else "Unknown Country"
