@@ -142,7 +142,7 @@ def create_trade_visualization(
 
     # Configure the layout with a more vibrant background
     fig.update_layout(
-        title='Global Trade Network Visualization',
+        title='Global Trade Network Visualization: Disparity Filter + Maximum Spanning Tree',
         geo=dict(
             projection_type='natural earth',
             showland=True,
@@ -343,7 +343,7 @@ def create_community_visualization(
 
     # Configure the layout with a vibrant background (same as in create_trade_visualization)
     fig.update_layout(
-        title='Global Trade Network by Communities',
+        title='Global Trade Network by Communities: Disparity Filter + Maximum Spanning Tree, grouped by communities',
         geo=dict(
             projection_type='natural earth',
             showland=True,
@@ -836,6 +836,46 @@ def create_choropleth_map(
     return fig
 
 
+def prepare_centrality_table_data(graph, analysis_results, centrality_type='eigenvector', n=10):
+    """Prepare data for the top countries by centrality table.
+
+    Args:
+        graph: The trade network graph
+        analysis_results: Dictionary of analysis results
+        centrality_type: Type of centrality to display
+        n: Number of top countries to include
+
+    Returns:
+        List of dictionaries for display in the dash table
+    """
+    centrality_measures = analysis_results.get('centrality_measures', {})
+
+    if not centrality_measures:
+        return []
+
+    # Create a list of (country_name, centrality_value) tuples
+    country_centrality = []
+    for node_id, measures in centrality_measures.items():
+        country_name = graph.nodes[node_id].get('name', node_id)
+        centrality_value = measures.get(centrality_type, 0)
+        country_centrality.append((country_name, centrality_value))
+
+    # Sort by centrality value in descending order
+    country_centrality.sort(key=lambda x: x[1], reverse=True)
+
+    # Create formatted table data
+    table_data = [
+        {
+            'Rank': i + 1,
+            'Country': country,
+            f'{centrality_type.capitalize()} Centrality': f"{value:.4f}"
+        }
+        for i, (country, value) in enumerate(country_centrality[:n])
+    ]
+
+    return table_data
+
+
 def create_dashboard(
         filtered_graph: nx.DiGraph,
         graph: nx.DiGraph,
@@ -972,6 +1012,9 @@ def create_dashboard(
             strongest_relationships_table = [{'Rank': i+1, 'Exporter': exporter, 'Importer': importer, 'Trade Value (USD)': f"${value:,.2f}"}
                                            for i, (exporter, importer, value) in enumerate(strongest_relationships_data)]
 
+            # Prepare centrality data for new table
+            centrality_table_data = prepare_centrality_table_data(filtered_graph, analysis_results)
+
             # Create a table design style
             table_style = {
                 'overflowX': 'auto',
@@ -1017,6 +1060,32 @@ def create_dashboard(
                 html.Div([
                     html.H2("Key Global Trade Insights",
                            style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
+
+                    # Centrality table
+                    html.Div([
+                        html.H3("Most Central Countries in Global Trade Network",
+                                style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+                        html.P(
+                            "Countries with high eigenvector centrality are connected to other important trading nations and serve as key hubs in the network.",
+                            style={'textAlign': 'center', 'marginBottom': '15px', 'fontStyle': 'italic'}),
+                        html.Div([
+                            dash_table.DataTable(
+                                id='centrality-table',
+                                columns=[{'name': col, 'id': col} for col in
+                                         ['Rank', 'Country', 'Eigenvector Centrality']],
+                                data=centrality_table_data,
+                                style_table=table_style,
+                                style_header=header_style,
+                                style_cell=cell_style,
+                                style_data_conditional=[
+                                    {
+                                        'if': {'row_index': 'odd'},
+                                        'backgroundColor': 'rgb(248, 248, 248)'
+                                    }
+                                ]
+                            )
+                        ])
+                    ], style={'marginBottom': '30px'}),
 
                     # Tables layout - 2 per row for desktop
                     html.Div([
@@ -1373,21 +1442,28 @@ def get_flag_emoji(country_name):
     return flag_emojis.get(country_name, '🌍')  # Default to globe if no flag found
 
 
-def get_community_countries(graph: nx.DiGraph, analysis_results: Dict[str, Any]) -> List[List[str]]:
-    """Get lists of countries in each trade community.
+def get_community_countries(graph: nx.DiGraph, analysis_results: Dict[str, Any],
+                            centrality_type: str = 'eigenvector') -> List[List[str]]:
+    """Get lists of countries in each trade community, ordered by centrality.
 
     Args:
         graph: The trade network graph
-        analysis_results: Dictionary of analysis results including trade_communities
+        analysis_results: Dictionary of analysis results including trade_communities and centrality_measures
+        centrality_type: Type of centrality to use for ordering ('eigenvector', 'betweenness', 'in_degree',
+                         'out_degree', or 'closeness'). Defaults to 'eigenvector'.
 
     Returns:
-        List of lists, where each inner list contains the country names in one community
+        List of lists, where each inner list contains the country names in one community,
+        ordered by the specified centrality measure (most central countries first)
     """
     if 'trade_communities' not in analysis_results:
         # If no communities in results, return empty list
         return []
 
     communities = analysis_results['trade_communities']
+
+    # Get centrality measures if available
+    centrality_measures = analysis_results.get('centrality_measures', {})
 
     # Create a reverse mapping to group countries by community
     community_groups = {}
@@ -1397,10 +1473,27 @@ def get_community_countries(graph: nx.DiGraph, analysis_results: Dict[str, Any])
 
         # Get country name from node attributes
         country_name = graph.nodes[node_id].get('name', node_id)
-        community_groups[community_id].append(country_name)
+
+        # Get centrality value for ordering
+        centrality = 0
+        if node_id in centrality_measures:
+            centrality = centrality_measures[node_id].get(centrality_type, 0)
+
+        # Store tuple of (country_name, centrality, node_id) for later sorting
+        community_groups[community_id].append((country_name, centrality, node_id))
+
+    # Create the final sorted list of community lists
+    sorted_communities = []
+    for community_id, country_data in community_groups.items():
+        # Sort countries by centrality (highest first)
+        country_data.sort(key=lambda x: x[1], reverse=True)
+
+        # Extract just the country names for the final list
+        country_names = [data[0] for data in country_data]
+        sorted_communities.append(country_names)
 
     # Sort communities by size (largest first)
-    sorted_communities = sorted(community_groups.values(), key=len, reverse=True)
+    sorted_communities.sort(key=len, reverse=True)
 
     return sorted_communities
 
