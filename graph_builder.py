@@ -126,7 +126,15 @@ def build_sparse_trade_graph(trade_data: pd.DataFrame, alpha_sig: float = DISP_F
     graph_bi = build_undirected_version(graph_original)
 
     def add_edge_to_graph(node_from: Any, node_to: Any) -> None:
-        """Add edges from graph_original to graph"""
+        """
+        Add edges from graph_original to graph.
+
+        Preconditions:
+            - node_from in graph_original.nodes
+            - node_from in graph.nodes
+            - node_to in graph_original.nodes
+            - node_to in graph.nodes
+        """
         if graph_original.has_edge(node_from, node_to):
             graph.add_edge(node_from, node_to, value=graph_original[node_from][node_to]['value'],
                            weight=graph_original[node_from][node_to]['weight'])
@@ -177,6 +185,8 @@ if __name__ == "__main__":
     doctest.testmod()
 
     import python_ta
+
+    # Disable R0914 error if you don't want to decrease number of local variables
     python_ta.check_all(config={
         'extra-imports': ['pandas', 'networkx', 'typing'],
         'max-line-length': 120,

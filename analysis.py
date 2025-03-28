@@ -340,6 +340,8 @@ if __name__ == '__main__':
     doctest.testmod()
 
     import python_ta
+
+    # Disable R0914 error if you don't want to decrease number of local variables
     python_ta.check_all(config={
         'extra-imports': ['pandas', 'networkx', 'typing', 'community', 'graph_builder'],
         'allowed-io': ['identify_trade_communities'],
