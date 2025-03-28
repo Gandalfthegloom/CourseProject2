@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 import dash
-from dash import dcc, html, Input, Output, callback
+from dash import dcc, html, dash_table, Input, Output, callback
 import random
 
 
@@ -759,165 +759,180 @@ def create_dashboard(
     def render_content(tab):
         # Wrap each tab's content in a container with consistent styling
         if tab == 'global-network':
-            # Define common table styles
-            table_header_style = {'backgroundColor': '#3498db', 'color': 'white', 'padding': '10px',
-                                  'textAlign': 'left', 'fontWeight': 'bold'}
-            odd_row_style = {'backgroundColor': '#f9f9f9'}
-            table_cell_style = {'padding': '8px', 'textAlign': 'left', 'borderBottom': '1px solid #ddd'}
-            table_style = {'width': '100%', 'borderCollapse': 'collapse', 'boxShadow': '0 2px 5px rgba(0,0,0,0.1)',
-                           'marginBottom': '20px'}
+            # Format data for tables
+            top_exporters_data = analysis_results.get('top_exporters', [])[:10]
+            top_exporters_table = [{'Rank': i+1, 'Country': country, 'Exports (USD)': f"${value:,.2f}"}
+                                  for i, (country, value) in enumerate(top_exporters_data)]
 
-            # Create exporters table
-            exporters_rows = []
-            for i, (country, value) in enumerate(analysis_results['top_exporters'][:10]):
-                row_style = odd_row_style if i % 2 else {}
-                exporters_rows.append(
-                    html.Tr([
-                        html.Td(f"#{i + 1}", style=table_cell_style),
-                        html.Td(country, style=table_cell_style),
-                        html.Td(f"${value:,.2f}", style=table_cell_style)
-                    ], style=row_style)
-                )
+            top_importers_data = analysis_results.get('top_importers', [])[:10]
+            top_importers_table = [{'Rank': i+1, 'Country': country, 'Imports (USD)': f"${value:,.2f}"}
+                                  for i, (country, value) in enumerate(top_importers_data)]
 
-            exporters_table = html.Div([
-                html.H3("Top Exporters", style={'textAlign': 'center', 'color': '#2c3e50'}),
-                html.Table(
-                    # Table Header
-                    [html.Tr([
-                        html.Th("Rank", style=table_header_style),
-                        html.Th("Country", style=table_header_style),
-                        html.Th("Export Value (USD)", style=table_header_style)
-                    ])] +
-                    # Table Rows
-                    exporters_rows,
-                    style=table_style
-                )
-            ], style={'width': '48%', 'display': 'inline-block', 'verticalAlign': 'top'})
+            strongest_relationships_data = analysis_results.get('strongest_relationships', [])[:10]
+            strongest_relationships_table = [{'Rank': i+1, 'Exporter': exporter, 'Importer': importer, 'Trade Value (USD)': f"${value:,.2f}"}
+                                           for i, (exporter, importer, value) in enumerate(strongest_relationships_data)]
 
-            # Create importers table
-            importers_rows = []
-            for i, (country, value) in enumerate(analysis_results['top_importers'][:10]):
-                row_style = odd_row_style if i % 2 else {}
-                importers_rows.append(
-                    html.Tr([
-                        html.Td(f"#{i + 1}", style=table_cell_style),
-                        html.Td(country, style=table_cell_style),
-                        html.Td(f"${value:,.2f}", style=table_cell_style)
-                    ], style=row_style)
-                )
+            # Create a table design style
+            table_style = {
+                'overflowX': 'auto',
+                'backgroundColor': 'white',
+                'border': '1px solid #ddd',
+                'borderRadius': '8px',
+                'boxShadow': '0 4px 6px rgba(0,0,0,0.1)',
+                'margin': '20px 0',
+                'width': '100%'
+            }
 
-            importers_table = html.Div([
-                html.H3("Top Importers", style={'textAlign': 'center', 'color': '#2c3e50'}),
-                html.Table(
-                    # Table Header
-                    [html.Tr([
-                        html.Th("Rank", style=table_header_style),
-                        html.Th("Country", style=table_header_style),
-                        html.Th("Import Value (USD)", style=table_header_style)
-                    ])] +
-                    # Table Rows
-                    importers_rows,
-                    style=table_style
-                )
-            ], style={'width': '48%', 'display': 'inline-block', 'verticalAlign': 'top'})
+            header_style = {
+                'backgroundColor': '#3498db',
+                'color': 'white',
+                'textAlign': 'center',
+                'fontWeight': 'bold',
+                'padding': '12px 15px'
+            }
 
-            # Create table for strongest relationships
-            relationships_rows = []
-            for i, (exporter, importer, value) in enumerate(analysis_results['strongest_relationships'][:10]):
-                row_style = odd_row_style if i % 2 else {}
-                relationships_rows.append(
-                    html.Tr([
-                        html.Td(f"#{i + 1}", style=table_cell_style),
-                        html.Td(exporter, style=table_cell_style),
-                        html.Td(importer, style=table_cell_style),
-                        html.Td(f"${value:,.2f}", style=table_cell_style)
-                    ], style=row_style)
-                )
+            cell_style = {
+                'textAlign': 'center',
+                'padding': '12px 15px',
+                'borderBottom': '1px solid #ddd'
+            }
 
-            relationships_table = html.Div([
-                html.H3("Strongest Trade Relationships", style={'textAlign': 'center', 'color': '#2c3e50'}),
-                html.Table(
-                    # Table Header
-                    [html.Tr([
-                        html.Th("Rank", style=table_header_style),
-                        html.Th("Exporter", style=table_header_style),
-                        html.Th("Importer", style=table_header_style),
-                        html.Th("Trade Value (USD)", style=table_header_style)
-                    ])] +
-                    # Table Rows
-                    relationships_rows,
-                    style=table_style
-                )
-            ], style={'width': '100%', 'margin': '0 auto'})
-
-            # For trade communities
-            communities_data = analysis_results['trade_communities']
-
-            # Reorganize communities by grouping countries with the same community ID
-            community_groups = {}
-            for country_id, community_id in communities_data.items():
-                if community_id not in community_groups:
-                    community_groups[community_id] = []
-
-                # Get the country name from the graph
-                country_name = filtered_graph.nodes[country_id].get('name', country_id)
-                community_groups[community_id].append(country_name)
-
-            # Sort communities by size (largest first)
-            sorted_communities = sorted(community_groups.items(), key=lambda x: len(x[1]), reverse=True)
-
-            # Create the communities display
-            communities_list = []
-            for i, (community_id, countries) in enumerate(sorted_communities[:3]):  # Show top 3 communities
-                countries_list = []
-                for j, country in enumerate(sorted(countries)[:15]):  # Show max 15 countries per community
-                    countries_list.append(html.Li(country, style={'padding': '3px 0'}))
-
-                if len(countries) > 15:
-                    countries_list.append(
-                        html.Li(f"... and {len(countries) - 15} more", style={'fontStyle': 'italic', 'color': '#777'}))
-
-                communities_list.append(
-                    html.Div([
-                        html.H4(f"Community {i + 1}",
-                                style={'textAlign': 'center', 'color': '#3498db', 'backgroundColor': '#ecf0f1',
-                                       'padding': '10px', 'borderRadius': '5px'}),
-                        html.Ul(countries_list, style={'listStyleType': 'circle', 'paddingLeft': '20px'})
-                    ], style={'width': '30%', 'display': 'inline-block', 'verticalAlign': 'top', 'margin': '10px'})
-                )
-
-            communities_div = html.Div([
-                html.H3("Major Trade Communities", style={'textAlign': 'center', 'color': '#2c3e50'}),
-                html.P("Countries grouped by similar trade patterns:",
-                       style={'textAlign': 'center', 'marginBottom': '20px'}),
-                html.Div(communities_list, style={'display': 'flex', 'justifyContent': 'space-around'})
-            ], style={'width': '100%', 'margin': '20px auto'})
-
-            # Return the overall layout with the map and tables
+            # Create the tab content
             return html.Div([
                 html.H2("Global Trade Network Overview",
                         style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
+                # Trade network visualization
                 dcc.Graph(
                     id='global-trade-graph',
                     figure=create_trade_visualization(filtered_graph, country_coords, analysis_results),
                     style={
-                        'height': '60vh',
+                        'height': '70vh',
                         'width': '90%',
                         'marginLeft': 'auto',
                         'marginRight': 'auto',
-                        'marginBottom': '20px'
+                        'marginBottom': '40px'
                     }
                 ),
-                html.H2("Trade Network Statistics",
-                        style={'textAlign': 'center', 'color': '#2c3e50', 'marginTop': '20px', 'marginBottom': '20px'}),
+                # Key insights section with tables
                 html.Div([
-                    exporters_table,
-                    importers_table
-                ], style={'display': 'flex', 'justifyContent': 'space-between', 'marginBottom': '20px'}),
-                relationships_table,
-                communities_div
+                    html.H2("Key Global Trade Insights",
+                           style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
+
+                    # Tables layout - 2 per row for desktop
+                    html.Div([
+                        # Left column - Top Exporters
+                        html.Div([
+                            html.H3("Top 10 Exporting Countries",
+                                   style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+                            html.Div([
+                                dash_table.DataTable(
+                                    id='top-exporters-table',
+                                    columns=[{'name': col, 'id': col} for col in ['Rank', 'Country', 'Exports (USD)']],
+                                    data=top_exporters_table,
+                                    style_table=table_style,
+                                    style_header=header_style,
+                                    style_cell=cell_style,
+                                    style_data_conditional=[
+                                        {
+                                            'if': {'row_index': 'odd'},
+                                            'backgroundColor': 'rgb(248, 248, 248)'
+                                        }
+                                    ]
+                                )
+                            ])
+                        ], style={'width': '48%', 'display': 'inline-block', 'verticalAlign': 'top'}),
+
+                        # Right column - Top Importers
+                        html.Div([
+                            html.H3("Top 10 Importing Countries",
+                                   style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+                            html.Div([
+                                dash_table.DataTable(
+                                    id='top-importers-table',
+                                    columns=[{'name': col, 'id': col} for col in ['Rank', 'Country', 'Imports (USD)']],
+                                    data=top_importers_table,
+                                    style_table=table_style,
+                                    style_header=header_style,
+                                    style_cell=cell_style,
+                                    style_data_conditional=[
+                                        {
+                                            'if': {'row_index': 'odd'},
+                                            'backgroundColor': 'rgb(248, 248, 248)'
+                                        }
+                                    ]
+                                )
+                            ])
+                        ], style={'width': '48%', 'display': 'inline-block', 'verticalAlign': 'top', 'marginLeft': '4%'})
+                    ], style={'marginBottom': '30px'}),
+
+                    # Strongest relationships (full width)
+                    html.Div([
+                        html.H3("Strongest Bilateral Trade Relationships",
+                               style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+                        html.Div([
+                            dash_table.DataTable(
+                                id='strongest-relationships-table',
+                                columns=[{'name': col, 'id': col} for col in ['Rank', 'Exporter', 'Importer', 'Trade Value (USD)']],
+                                data=strongest_relationships_table,
+                                style_table=table_style,
+                                style_header=header_style,
+                                style_cell=cell_style,
+                                style_data_conditional=[
+                                    {
+                                        'if': {'row_index': 'odd'},
+                                        'backgroundColor': 'rgb(248, 248, 248)'
+                                    }
+                                ]
+                            )
+                        ])
+                    ], style={'marginBottom': '30px'}),
+
+                    # Trade communities (if available)
+                    html.Div([
+                        html.H3("Trade Communities Overview",
+                               style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+                        html.P("The analysis identified major trading communities or blocs in the global trade network.",
+                              style={'textAlign': 'center', 'marginBottom': '15px'}),
+                        html.Div([
+                            html.Div([
+                                html.H4(f"Community {i+1}", style={'color': '#3498db', 'marginBottom': '10px'}),
+                                html.P(f"Number of countries: {len(community_countries)}",
+                                      style={'marginBottom': '5px'}),
+                                html.P("Key members: " + ", ".join(community_countries[:5]) +
+                                      ("..." if len(community_countries) > 5 else ""),
+                                      style={'fontStyle': 'italic'})
+                            ], style={
+                                'backgroundColor': 'white',
+                                'borderRadius': '8px',
+                                'padding': '15px',
+                                'marginBottom': '15px',
+                                'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                            })
+                            for i, community_countries in enumerate(get_community_countries(filtered_graph, analysis_results))
+                            if i < 5  # Show only the top 5 communities
+                        ])
+                    ], style={'marginBottom': '30px'})
+                ], style={
+                    'backgroundColor': 'rgba(255, 255, 255, 0.8)',
+                    'borderRadius': '10px',
+                    'padding': '20px',
+                    'boxShadow': '0 4px 8px rgba(0,0,0,0.1)',
+                    'marginBottom': '50px',
+                    'width': '90%',
+                    'marginLeft': 'auto',
+                    'marginRight': 'auto'
+                })
             ])
+
         elif tab == 'country-trade':
+            # Regenerate countries list within the callback to avoid scope issues
+            current_countries = [(node_id, data['name']) for node_id, data in filtered_graph.nodes(data=True)]
+            current_countries.sort(key=lambda x: x[1])  # Sort by country name
+
+            # Find the ID for Afghanistan (or first country if Afghanistan not found)
+            current_default = next((id_ for id_, name in current_countries if name.lower() == 'afghanistan'),
+                                  current_countries[0][0] if current_countries else None)
+
             return html.Div([
                 html.H2("Country-Specific Trade Relationships",
                         style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
@@ -926,13 +941,13 @@ def create_dashboard(
                                style={'fontWeight': 'bold', 'marginRight': '10px', 'fontSize': '0.95 em'}),
                     dcc.Dropdown(
                         id='country-dropdown',
-                        options=[{'label': f'{get_flag_emoji(name)} {name}', 'value': id_} for id_, name in countries],
-                        value=default_country,  # Set default to Afghanistan or first country
+                        options=[{'label': f'{get_flag_emoji(name)} {name}', 'value': id_} for id_, name in current_countries],
+                        value=current_default,  # Set default to Afghanistan or first country
                         style={'width': '50%', 'margin': '0 auto'}
                     )
                 ], style={'textAlign': 'center', 'marginBottom': '20px'}),
                 dcc.Graph(id='country-trade-graph',
-                          figure=visualize_country_trade(graph, default_country, country_coords, analysis_results),
+                          figure=visualize_country_trade(graph, current_default, country_coords, analysis_results),
                           style={
                               'height': '70vh',
                               'width': '90%',
@@ -942,6 +957,7 @@ def create_dashboard(
                           }
                           )
             ])
+
         elif tab == 'trade-metrics':
             return html.Div([
                 html.H2("Global Trade Metrics",
@@ -1142,6 +1158,38 @@ def get_flag_emoji(country_name):
                    'Wallis and Futuna': '🇼🇫', 'Samoa': '🇼🇸'}
 
     return flag_emojis.get(country_name, '🌍')  # Default to globe if no flag found
+
+
+def get_community_countries(graph: nx.DiGraph, analysis_results: Dict[str, Any]) -> List[List[str]]:
+    """Get lists of countries in each trade community.
+
+    Args:
+        graph: The trade network graph
+        analysis_results: Dictionary of analysis results including trade_communities
+
+    Returns:
+        List of lists, where each inner list contains the country names in one community
+    """
+    if 'trade_communities' not in analysis_results:
+        # If no communities in results, return empty list
+        return []
+
+    communities = analysis_results['trade_communities']
+
+    # Create a reverse mapping to group countries by community
+    community_groups = {}
+    for node_id, community_id in communities.items():
+        if community_id not in community_groups:
+            community_groups[community_id] = []
+
+        # Get country name from node attributes
+        country_name = graph.nodes[node_id].get('name', node_id)
+        community_groups[community_id].append(country_name)
+
+    # Sort communities by size (largest first)
+    sorted_communities = sorted(community_groups.values(), key=len, reverse=True)
+
+    return sorted_communities
 
 
 if __name__ == '__main__':
