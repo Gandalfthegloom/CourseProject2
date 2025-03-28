@@ -7,6 +7,8 @@ It handles the cleaning, filtering, and preparation of data for graph constructi
 from typing import Dict, Any, List, Tuple
 import pandas as pd
 import plotly.express as px
+import os
+import json
 
 
 def load_trade_data(file_path: str) -> pd.DataFrame:
@@ -50,10 +52,6 @@ def get_country_coordinates() -> pd.DataFrame:
     Returns:
         A DataFrame with columns 'country', 'centroid_lat', and 'centroid_lon'.
     """
-    import plotly.express as px
-    import pandas as pd
-    import os
-    import json
 
     # Load gapminder centroids
     gapminder = px.data.gapminder(centroids=True)
@@ -146,6 +144,11 @@ def filter_by_trade_volume(data: pd.DataFrame, min_value: float) -> pd.DataFrame
 
     Returns:
         A filtered DataFrame containing only the trade relationships above the threshold
+
+    Preconditions:
+        - data is a pd.DataFrame instance with the expected columns:
+          'exporter_id', 'exporter_name', 'importer_id', 'importer_name', 'value'
+        - min_value > 0
     """
     # Filter the DataFrame based on the 'value' column
     filtered_data = data[data['value'] >= min_value]
@@ -153,22 +156,28 @@ def filter_by_trade_volume(data: pd.DataFrame, min_value: float) -> pd.DataFrame
     return filtered_data
 
 
-def get_top_trading_partners(data: pd.DataFrame, country_id: str, n: int = 10) -> pd.DataFrame:
+def get_top_trading_partners(data: pd.DataFrame, country_id: str, limit: int = 10) -> pd.DataFrame:
     """Get the top trading partners for a specific country.
 
     Args:
         data: The trade data DataFrame
         country_id: The ID of the country to find partners for
-        n: The number of top partners to return
+        limit: The number of top partners to return
 
     Returns:
-        A DataFrame containing the top n trading partners sorted by trade value
+        A DataFrame with the size of limit containing the top trading partners sorted by trade value
+
+    Preconditions:
+        - data is a pd.DataFrame instance with the expected columns:
+          'exporter_id', 'exporter_name', 'importer_id', 'importer_name', 'value'
+        - country_id in data['exporter_id']
+        - limit >= 1
     """
     # Filter for exports from the specified country
     exports = data[data['exporter_id'] == country_id].copy()
 
     # Sort by value in descending order and take the top n
-    top_partners = exports.sort_values('value', ascending=False).head(n)
+    top_partners = exports.sort_values('value', ascending=False).head(limit)
 
     return top_partners
 

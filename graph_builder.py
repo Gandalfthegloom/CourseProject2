@@ -9,6 +9,8 @@ function constructs the graph from processed trade data.
 import pandas as pd
 import networkx as nx
 
+DISP_FILTER_ALPHA_SIG = float(1e-12)  # alpha significance for disparity filter
+
 
 def build_trade_graph(trade_data: pd.DataFrame) -> nx.DiGraph:
     """
@@ -70,16 +72,15 @@ def build_trade_graph(trade_data: pd.DataFrame) -> nx.DiGraph:
     return graph
 
 
-def build_sparse_trade_graph(trade_data: pd.DataFrame, use_disparity_filter: bool = True,
-                             alpha: float = 0.00000000000001) -> nx.DiGraph:
+def build_sparse_trade_graph(trade_data: pd.DataFrame, alpha_sig: float = DISP_FILTER_ALPHA_SIG) -> nx.DiGraph:
     """
     Constructs a sparse version of the directed graph representing the overview of global trade network.
 
     Args:
         trade_data: A pandas DataFrame containing the trade data with columns:
                     'exporter_id', 'exporter_name', 'importer_id', 'importer_name', 'value'
-        use_disparity_filter: An option to either use disparity filter or not. Default is False
-        alpha: The p-value for the disparity filter. Default is 0.05
+        alpha_sig: The alpha significance threshold for the disparity filter.
+                   Set the parameter to 0 to disable disparity filter. Default is DISP_FILTER_ALPHA_SIG
 
     Returns:
         A NetworkX Graph where:
@@ -90,6 +91,9 @@ def build_sparse_trade_graph(trade_data: pd.DataFrame, use_disparity_filter: boo
         - Edges represent major trade relationships with attribute:
             - 'value': The trade value in USD
             - 'weight': Same as value, used for algorithms that rely on the 'weight' attribute
+
+    Preconditions:
+        - 0 <= alpha_sig < 1
     """
     # Construct the original trade graph and create the new sparse graph
     graph_original = build_trade_graph(trade_data)
@@ -110,37 +114,36 @@ def build_sparse_trade_graph(trade_data: pd.DataFrame, use_disparity_filter: boo
                 combined_weight = graph_original[vertex][nbr]['weight']
             graph_bi.add_edge(vertex, nbr, weight=combined_weight)
 
-    if use_disparity_filter:
-        # Use disparity filter to make the graph sparse
-        for vertex in graph.nodes:
-            adjacent = list(graph_original[vertex])
-            k = len(adjacent)
+    # Use disparity filter to make the graph sparse
+    for vertex in graph.nodes:
+        adjacent = list(graph_original[vertex])
+        k = len(adjacent)
 
-            # If the degree is 1, just connect it
-            if k == 1:
-                graph.add_edge(vertex, adjacent[0], value=graph_original[vertex][adjacent[0]]['value'],
-                               weight=graph_original[vertex][adjacent[0]]['weight'])
-                if graph_original.has_edge(adjacent[0], vertex):
-                    graph.add_edge(adjacent[0], vertex, value=graph_original[adjacent[0]][vertex]['value'],
-                                   weight=graph_original[adjacent[0]][vertex]['weight'])
-                continue
+        # If the degree is 1, just connect it
+        if k == 1:
+            graph.add_edge(vertex, adjacent[0], value=graph_original[vertex][adjacent[0]]['value'],
+                           weight=graph_original[vertex][adjacent[0]]['weight'])
+            if graph_original.has_edge(adjacent[0], vertex):
+                graph.add_edge(adjacent[0], vertex, value=graph_original[adjacent[0]][vertex]['value'],
+                               weight=graph_original[adjacent[0]][vertex]['weight'])
+            continue
 
-            # Total weight of edges that are connected to the vertex
-            # Note that we treat each edge as undirected, and the weight is simply sum of all edges that
-            # connects the same pair
-            total_weight = graph.nodes[vertex]['total_exports'] + graph.nodes[vertex]['total_imports']
-            for nbr in adjacent:
-                # Weight contribution from each edge
-                pij = graph_bi[vertex][nbr]['weight'] / total_weight
-                significance = (1 - pij) ** (k - 1)  # p-value from null model
+        # Total weight of edges that are connected to the vertex
+        # Note that we treat each edge as undirected, and the weight is simply sum of all edges that
+        # connects the same pair
+        total_weight = graph.nodes[vertex]['total_exports'] + graph.nodes[vertex]['total_imports']
+        for nbr in adjacent:
+            # Weight contribution from each edge
+            pij = graph_bi[vertex][nbr]['weight'] / total_weight
+            significance = (1 - pij) ** (k - 1)  # p-value from null model
 
-                # If the edge is statistically significant, don't remove it
-                if significance < alpha:
-                    graph.add_edge(vertex, nbr, value=graph_original[vertex][nbr]['value'],
-                                   weight=graph_original[vertex][nbr]['weight'])
-                    if graph_original.has_edge(nbr, vertex):
-                        graph.add_edge(nbr, vertex, value=graph_original[nbr][vertex]['value'],
-                                       weight=graph_original[nbr][vertex]['weight'])
+            # If the edge is statistically significant, don't remove it
+            if significance < alpha_sig:
+                graph.add_edge(vertex, nbr, value=graph_original[vertex][nbr]['value'],
+                               weight=graph_original[vertex][nbr]['weight'])
+                if graph_original.has_edge(nbr, vertex):
+                    graph.add_edge(nbr, vertex, value=graph_original[nbr][vertex]['value'],
+                                   weight=graph_original[nbr][vertex]['weight'])
 
     # Use maximum spanning tree to connect all vertices using significant edges (if it's not connected yet)
     if not nx.is_weakly_connected(graph):
