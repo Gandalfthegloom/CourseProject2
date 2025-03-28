@@ -7,6 +7,7 @@ meaningful insights about global trade patterns and dependencies.
 from typing import Dict, List, Tuple, Any
 import networkx as nx
 import pandas as pd
+import community as community_louvain
 
 
 def analyze_trade_network(graph: nx.DiGraph) -> Dict[str, Any]:
@@ -212,52 +213,6 @@ def identify_trade_communities(graph: nx.Graph) -> dict:
     Returns:
         A dictionary mapping node IDs to community IDs
     """
-    try:
-        import community as community_louvain
-    except ImportError:
-        # If python-louvain is not installed, try with community_detection
-        try:
-            from networkx.algorithms import community as community_detection
-            # Convert directed graph to undirected for community detection
-            undirected_graph = graph.to_undirected()
-
-            # Use Girvan-Newman algorithm as an alternative if Louvain is not available
-            communities_generator = community_detection.girvan_newman(undirected_graph)
-            # Get the first level of communities
-            communities = next(communities_generator)
-
-            # Convert the communities format to a dictionary
-            partition = {}
-            for i, community in enumerate(communities):
-                for node in community:
-                    partition[node] = i
-
-            # Count the number of communities
-            num_communities = len(communities)
-            print(f"Detected {num_communities} trade communities (using Girvan-Newman algorithm)")
-
-            return partition
-        except:
-            # Fallback to a simple clustering approach
-            print("WARNING: Community detection libraries not available.")
-            print("Using a simplified approach for community detection.")
-
-            # Convert directed graph to undirected for community detection
-            undirected_graph = graph.to_undirected()
-
-            # Use connected components as a simple community detection
-            components = list(nx.connected_components(undirected_graph))
-
-            # Create a partition dictionary
-            partition = {}
-            for i, component in enumerate(components):
-                for node in component:
-                    partition[node] = i
-
-            print(f"Detected {len(components)} trade communities (using connected components)")
-
-            return partition
-
     # Convert directed graph to undirected for community detection
     undirected_graph = graph.to_undirected()
 

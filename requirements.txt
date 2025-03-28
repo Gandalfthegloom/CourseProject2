@@ -7,6 +7,7 @@ numpy>=1.25.0
 
 # Graph operations
 networkx>=3.1
+python-louvain>=0.16
 
 # Visualization
 plotly>=5.22.0

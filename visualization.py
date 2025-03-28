@@ -199,7 +199,7 @@ def create_community_visualization(
     unique_communities = set(communities.values())
     num_communities = len(unique_communities)
 
-    # Create a color map for communities - using a colorful scale
+    # Create a color map for communities - for max 5 communities
     community_colors = {}
     colorscales = ['Viridis', 'Plasma', 'Inferno', 'Magma', 'Cividis']
     chosen_scale = colorscales[0]  # Default to Viridis
@@ -242,7 +242,7 @@ def create_community_visualization(
             # Prepare hover text
             hover_text = (
                 f"<b>{country_name}</b><br>"
-                f"Community: {community_id}<br>"
+                f"Community: {community_id + 1}<br>"
                 f"Total Exports: ${data['total_exports']:,.2f}<br>"
                 f"Total Imports: ${data['total_imports']:,.2f}<br>"
                 f"Trade Balance: ${data['total_exports'] - data['total_imports']:,.2f}<br>"
