@@ -163,6 +163,206 @@ def create_trade_visualization(
     return fig
 
 
+def create_community_visualization(
+        graph: nx.DiGraph,
+        country_coords: pd.DataFrame,
+        analysis_results: Dict[str, Any]
+) -> go.Figure:
+    """Create an interactive visualization of the global trade network with community coloring.
+
+    Countries and trade flows are colored based on their community membership.
+
+    Args:
+        graph: NetworkX DiGraph containing the trade network
+        country_coords: DataFrame with country coordinates
+        analysis_results: Dictionary containing analysis results including trade_communities
+
+    Returns:
+        A Plotly figure with the visualization
+    """
+    # Create a base world map
+    fig = go.Figure()
+
+    # Create a mapping of country names to coordinates
+    country_coord_map = dict(zip(country_coords['country'],
+                                 zip(country_coords['centroid_lat'], country_coords['centroid_lon'])))
+
+    # Get community assignments from analysis results
+    communities = analysis_results.get('trade_communities', {})
+
+    if not communities:
+        print("Warning: No community data found in analysis results")
+        # Fall back to the regular visualization if no communities
+        return create_trade_visualization(graph, country_coords, analysis_results)
+
+    # Generate distinct colors for each community
+    unique_communities = set(communities.values())
+    num_communities = len(unique_communities)
+
+    # Create a color map for communities - using a colorful scale
+    community_colors = {}
+    colorscales = ['Viridis', 'Plasma', 'Inferno', 'Magma', 'Cividis']
+    chosen_scale = colorscales[0]  # Default to Viridis
+
+    # Use a continuous color scale for a large number of communities
+    import plotly.colors as pc
+    if num_communities <= 10:
+        # For small number of communities, use discrete colors
+        colors = pc.qualitative.Bold + pc.qualitative.Prism
+        for i, community_id in enumerate(sorted(unique_communities)):
+            community_colors[community_id] = colors[i % len(colors)]
+    else:
+        # For many communities, use a continuous color scale
+        color_scale = getattr(pc.sequential, chosen_scale)
+        for i, community_id in enumerate(sorted(unique_communities)):
+            index = i / (num_communities - 1) if num_communities > 1 else 0.5
+            community_colors[community_id] = pc.sample_colorscale(color_scale, index)[0]
+
+    # Add nodes (countries) as scatter markers
+    node_sizes = []
+    node_colors = []
+    node_texts = []
+    node_lats = []
+    node_lons = []
+    node_communities = []
+
+    for country_id, data in graph.nodes(data=True):
+        country_name = data['name']
+        if country_name in country_coord_map:
+            lat, lon = country_coord_map[country_name]
+
+            # Calculate node size based on total trade volume
+            total_trade = data['total_exports'] + data['total_imports']
+            node_size = 7 + (total_trade / 1e9) ** 0.49  # Hybrid scaling as in the original
+
+            # Get community color
+            community_id = communities.get(country_id, -1)  # Default to -1 if not in a community
+            node_community = community_id
+
+            # Prepare hover text
+            hover_text = (
+                f"<b>{country_name}</b><br>"
+                f"Community: {community_id}<br>"
+                f"Total Exports: ${data['total_exports']:,.2f}<br>"
+                f"Total Imports: ${data['total_imports']:,.2f}<br>"
+                f"Trade Balance: ${data['total_exports'] - data['total_imports']:,.2f}<br>"
+            )
+
+            node_sizes.append(node_size)
+            node_colors.append(community_id)
+            node_texts.append(hover_text)
+            node_lats.append(lat)
+            node_lons.append(lon)
+            node_communities.append(community_id)
+
+    # Create continuous color scale mapping for communities
+    unique_communities_sorted = sorted(set(node_communities))
+    community_to_index = {comm: i / (len(unique_communities_sorted) - 1) if len(unique_communities_sorted) > 1 else 0.5
+                          for i, comm in enumerate(unique_communities_sorted)}
+
+    # Map community IDs to values between 0 and 1 for coloring
+    node_color_values = [community_to_index.get(comm, 0.5) for comm in node_communities]
+
+    # Add country nodes to the figure
+    fig.add_trace(go.Scattergeo(
+        lon=node_lons,
+        lat=node_lats,
+        text=node_texts,
+        mode='markers',
+        marker=dict(
+            size=node_sizes,
+            color=node_color_values,
+            colorscale=chosen_scale,
+            colorbar=dict(
+                title=dict(
+                    text="Trade Communities",
+                    font=dict(size=12),
+                    side="right"
+                ),
+                thickness=15,
+                len=0.5,
+                y=0.5,
+                yanchor="middle",
+                x=1.02,
+                xanchor="left",
+                outlinewidth=1,
+                outlinecolor="black",
+                tickmode='array',
+                tickvals=[community_to_index.get(comm, 0.5) for comm in sorted(unique_communities_sorted)],
+                ticktext=[str(comm) for comm in sorted(unique_communities_sorted)]
+            ),
+            line=dict(width=1, color='black')
+        ),
+        hoverinfo='text',
+        name='Countries'
+    ))
+
+    # Add edges (trade flows) colored by source community
+    # Create a dictionary to store edges by source country
+    country_edges = {}
+    for source, target, data in graph.edges(data=True):
+        source_name = graph.nodes[source]['name']
+        target_name = graph.nodes[target]['name']
+
+        if source_name in country_coord_map and target_name in country_coord_map:
+            if source_name not in country_edges:
+                country_edges[source_name] = []
+            country_edges[source_name].append((source, source_name, target, target_name, data['value']))
+
+    # Get top trading partners for each country
+    top_edges = []
+    for country, edges in country_edges.items():
+        # Sort edges for this country by value
+        edges.sort(key=lambda x: x[4], reverse=True)
+        # Take top 100 or fewer if less than 100 exist (as in the original function)
+        top_country_edges = edges[:100]
+        top_edges.extend(top_country_edges)
+
+    # Add arrows for each top trade relationship
+    for source_id, source_name, target_id, target_name, value in top_edges:
+        if source_name in country_coord_map and target_name in country_coord_map:
+            start_lat, start_lon = country_coord_map[source_name]
+            end_lat, end_lon = country_coord_map[target_name]
+
+            # Calculate edge weight (line thickness) based on value
+            weight = 0.15 + (value / 1e9) ** 0.2
+
+            # Get community of source country for coloring
+            source_community = communities.get(source_id, -1)
+            edge_color = community_colors.get(source_community, 'grey')
+
+            # Add the trade flow arrow
+            plot_trade_arrow(
+                fig,
+                start_lat, start_lon,
+                end_lat, end_lon,
+                weight,
+                edge_color,  # Color based on source country's community
+                f"<b>Trade Flow</b><br>{source_name} → {target_name}<br>Value: ${value:,.2f}<br>Community: {source_community}"
+            )
+
+    # Configure the layout with a vibrant background (same as in create_trade_visualization)
+    fig.update_layout(
+        title='Global Trade Network by Communities',
+        geo=dict(
+            projection_type='natural earth',
+            showland=True,
+            landcolor='rgb(240, 248, 255)',  # Light blue background for land
+            showcountries=True,
+            countrycolor='rgb(173, 216, 230)',  # Lighter country borders
+            showocean=True,
+            oceancolor='rgb(230, 250, 255)',  # Softer ocean color
+            showlakes=True,
+            lakecolor='rgb(220, 240, 255)'
+        ),
+        height=800,
+        margin=dict(l=0, r=0, t=50, b=0),
+        paper_bgcolor='rgba(230, 240, 255, 0.5)',  # Very light blue background
+        plot_bgcolor='rgba(230, 240, 255, 0.5)'
+    )
+    return fig
+
+
 def visualize_country_trade(
         graph: nx.DiGraph,
         country_id: str,
@@ -886,7 +1086,20 @@ def create_dashboard(
                             )
                         ])
                     ], style={'marginBottom': '30px'}),
-
+                    html.H2("Global Trade Communities Overview",
+                            style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
+                    # Trade network visualization
+                    dcc.Graph(
+                        id='global-trade-graph',
+                        figure=create_community_visualization(filtered_graph, country_coords, analysis_results),
+                        style={
+                            'height': '70vh',
+                            'width': '90%',
+                            'marginLeft': 'auto',
+                            'marginRight': 'auto',
+                            'marginBottom': '40px'
+                        }
+                    ),
                     # Trade communities (if available)
                     html.Div([
                         html.H3("Trade Communities Overview",
