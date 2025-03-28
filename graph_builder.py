@@ -6,6 +6,7 @@ to represent each country with its export and import relationships. The build_tr
 function constructs the graph from processed trade data.
 """
 
+from typing import Any
 import pandas as pd
 import networkx as nx
 
@@ -72,6 +73,27 @@ def build_trade_graph(trade_data: pd.DataFrame) -> nx.DiGraph:
     return graph
 
 
+def build_undirected_version(graph_original: nx.DiGraph) -> nx.Graph:
+    """
+    Returns the undirected version of graph_original, which is the trade graph. Here, all edges that connect the
+    same pair of vertices will be merged by adding their value and weight.
+    """
+    # Construct an undirected version of graph_original
+    graph_bi = nx.Graph()
+    graph_bi.add_nodes_from(graph_original.nodes(data=True))  # Copy the information of all vertices
+    for vertex in graph_original.nodes:
+        for nbr in graph_original.neighbors(vertex):  # iterate over out-neighbors
+            # Check if the reciprocal edge exists
+            if graph_original.has_edge(nbr, vertex):
+                combined_weight = graph_original[vertex][nbr]['weight'] + graph_original[nbr][vertex]['weight']
+            else:
+                # If not, use the weight of the single edge
+                combined_weight = graph_original[vertex][nbr]['weight']
+            graph_bi.add_edge(vertex, nbr, value=combined_weight, weight=combined_weight)
+
+    return graph_bi
+
+
 def build_sparse_trade_graph(trade_data: pd.DataFrame, alpha_sig: float = DISP_FILTER_ALPHA_SIG) -> nx.DiGraph:
     """
     Constructs a sparse version of the directed graph representing the overview of global trade network.
@@ -101,66 +123,59 @@ def build_sparse_trade_graph(trade_data: pd.DataFrame, alpha_sig: float = DISP_F
     graph.add_nodes_from(graph_original.nodes(data=True))  # Copy the information of all vertices
 
     # Construct an undirected version of graph_original
-    graph_bi = nx.Graph()
-    graph_bi.add_nodes_from(graph_original.nodes(data=True))  # Copy the information of all vertices
-    for vertex in graph_original.nodes:
-        for nbr in graph_original.neighbors(vertex):  # iterate over out-neighbors
-            # Check if the reciprocal edge exists
-            if graph_original.has_edge(nbr, vertex):
-                combined_weight = (graph_original[vertex][nbr]['weight'] +
-                                   graph_original[nbr][vertex]['weight'])
-            else:
-                # If not, use the weight of the single edge
-                combined_weight = graph_original[vertex][nbr]['weight']
-            graph_bi.add_edge(vertex, nbr, weight=combined_weight)
+    graph_bi = build_undirected_version(graph_original)
+
+    def add_edge_to_graph(node_from: Any, node_to: Any) -> None:
+        """
+        Add edges from graph_original to graph.
+
+        Preconditions:
+            - node_from in graph_original.nodes
+            - node_from in graph.nodes
+            - node_to in graph_original.nodes
+            - node_to in graph.nodes
+        """
+        if graph_original.has_edge(node_from, node_to):
+            graph.add_edge(node_from, node_to, value=graph_original[node_from][node_to]['value'],
+                           weight=graph_original[node_from][node_to]['weight'])
+        if graph_original.has_edge(node_to, node_from):
+            graph.add_edge(node_to, node_from, value=graph_original[node_to][node_from]['value'],
+                           weight=graph_original[node_to][node_from]['weight'])
 
     # Use disparity filter to make the graph sparse
-    for vertex in graph.nodes:
+    for vertex, data in graph.nodes(data=True):
         adjacent = list(graph_original[vertex])
         k = len(adjacent)
 
         # If the degree is 1, just connect it
         if k == 1:
-            graph.add_edge(vertex, adjacent[0], value=graph_original[vertex][adjacent[0]]['value'],
-                           weight=graph_original[vertex][adjacent[0]]['weight'])
-            if graph_original.has_edge(adjacent[0], vertex):
-                graph.add_edge(adjacent[0], vertex, value=graph_original[adjacent[0]][vertex]['value'],
-                               weight=graph_original[adjacent[0]][vertex]['weight'])
+            add_edge_to_graph(vertex, adjacent[0])
             continue
 
         # Total weight of edges that are connected to the vertex
-        # Note that we treat each edge as undirected, and the weight is simply sum of all edges that
-        # connects the same pair
-        total_weight = graph.nodes[vertex]['total_exports'] + graph.nodes[vertex]['total_imports']
+        # Note that we treat each edge as undirected,
+        # and the weight is simply sum of all edges that connects the same pair
+        total_weight = data['total_exports'] + data['total_imports']
         for nbr in adjacent:
             # Weight contribution from each edge
             pij = graph_bi[vertex][nbr]['weight'] / total_weight
-            significance = (1 - pij) ** (k - 1)  # p-value from null model
+            p_val = (1 - pij) ** (k - 1)  # p-value from null model
 
             # If the edge is statistically significant, don't remove it
-            if significance < alpha_sig:
-                graph.add_edge(vertex, nbr, value=graph_original[vertex][nbr]['value'],
-                               weight=graph_original[vertex][nbr]['weight'])
-                if graph_original.has_edge(nbr, vertex):
-                    graph.add_edge(nbr, vertex, value=graph_original[nbr][vertex]['value'],
-                                   weight=graph_original[nbr][vertex]['weight'])
+            if p_val < alpha_sig:
+                add_edge_to_graph(vertex, nbr)
 
     # Use maximum spanning tree to connect all vertices using significant edges (if it's not connected yet)
     if not nx.is_weakly_connected(graph):
         # Invert all the edges such that MST algorithm catches the one with max weight
-        for u, v, data in graph_bi.edges(data=True):
+        for _, _, data in graph_bi.edges(data=True):
             data['weight'] = -data['weight']
 
         max_st = nx.minimum_spanning_tree(graph_bi)
 
         # Add the edges from maximum spanning tree to ensure connectivity
-        for u, v, data in max_st.edges(data=True):
-            if graph_original.has_edge(u, v):
-                graph.add_edge(u, v, value=graph_original[u][v]['value'],
-                               weight=graph_original[u][v]['weight'])
-            if graph_original.has_edge(v, u):
-                graph.add_edge(v, u, value=graph_original[v][u]['value'],
-                               weight=graph_original[v][u]['weight'])
+        for u, v in max_st.edges:
+            add_edge_to_graph(u, v)
 
     return graph
 
@@ -168,3 +183,12 @@ def build_sparse_trade_graph(trade_data: pd.DataFrame, alpha_sig: float = DISP_F
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
+
+    import python_ta
+
+    # Disable R0914 error if you don't want to decrease number of local variables
+    python_ta.check_all(config={
+        'extra-imports': ['pandas', 'networkx', 'typing'],
+        'max-line-length': 120,
+        'disable': ['R1705', 'C0200', 'W1114']
+    })

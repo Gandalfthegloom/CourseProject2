@@ -6,8 +6,10 @@ meaningful insights about global trade patterns and dependencies.
 
 from typing import Dict, List, Tuple, Any
 import networkx as nx
-import pandas as pd
 import community as community_louvain
+from graph_builder import build_undirected_version
+
+FIXED_SEED = 111  # For any function that uses random algorithm
 
 
 def analyze_trade_network(graph: nx.DiGraph) -> Dict[str, Any]:
@@ -32,7 +34,7 @@ def analyze_trade_network(graph: nx.DiGraph) -> Dict[str, Any]:
         'top_importers': get_top_importers(graph),
         'trade_balance': calculate_trade_balance(graph),
         'centrality_measures': calculate_centrality_measures(graph),
-        'strongest_relationships': get_strongest_trade_relationships(graph),
+        'strongest_relationships': get_strongest_trade_relations(graph),
         'trade_communities': identify_trade_communities(graph)
     }
     return results
@@ -47,6 +49,9 @@ def get_top_exporters(graph: nx.DiGraph, n: int = 20) -> List[Tuple[str, float]]
 
     Returns:
         A list of (country_name, export_value) tuples, sorted by export value in descending order
+
+    Preconditions:
+        - 1 <= n <= len(graph)
     """
     # Calculate total exports for each country node
     exporters = []
@@ -76,6 +81,9 @@ def get_top_importers(graph: nx.DiGraph, n: int = 20) -> List[Tuple[str, float]]
 
     Returns:
         A list of (country_name, import_value) tuples, sorted by import value in descending order
+
+    Preconditions:
+        - 1 <= n <= len(graph)
     """
     # Calculate total imports for each country node
     importers = []
@@ -127,6 +135,10 @@ def calculate_trade_balance(graph: nx.DiGraph) -> Dict[str, float]:
 def calculate_centrality_measures(graph: nx.DiGraph) -> dict:
     """Calculate various centrality measures for nodes in the trade network.
 
+    IMPORTANT NOTE: We cannot use betweenness centrality and closeness centrality, as both centrality methods
+    are related to "shortest path", while our dataset is NOT a trade route, but rather a trade relation. Thus,
+    no routes or "shortest paths" are involved.
+
     Args:
         graph: A directed graph representing the global trade network
 
@@ -142,7 +154,7 @@ def calculate_centrality_measures(graph: nx.DiGraph) -> dict:
 
     # Betweenness centrality - measures how often a node appears on shortest paths
     # Countries with high betweenness are important trade intermediaries
-    betweenness = nx.betweenness_centrality(graph, weight='weight')
+    # betweenness = nx.betweenness_centrality(graph, weight='weight')
 
     # Eigenvector centrality - measures connection to important nodes
     # Countries with high eigenvector centrality trade with other important countries
@@ -153,25 +165,25 @@ def calculate_centrality_measures(graph: nx.DiGraph) -> dict:
 
     # Add closeness centrality - measures how close a node is to all other nodes
     # Countries with high closeness centrality have short paths to many other countries
-    try:
-        closeness = nx.closeness_centrality(graph, distance='weight')
-    except:
-        closeness = {node: 0.0 for node in graph.nodes()}
+    # try:
+    #     closeness = nx.closeness_centrality(graph, distance='weight')
+    # except (nx.NetworkXError, ZeroDivisionError):
+    #     closeness = {node: 0.0 for node in graph.nodes()}
 
     # Combine all measures into a single dictionary
     for node in graph.nodes():
         centrality_measures[node] = {
             'in_degree': in_degree.get(node, 0),
             'out_degree': out_degree.get(node, 0),
-            'betweenness': betweenness.get(node, 0),
+            # 'betweenness': betweenness.get(node, 0),
             'eigenvector': eigenvector.get(node, 0),
-            'closeness': closeness.get(node, 0)
+            # 'closeness': closeness.get(node, 0)
         }
 
     return centrality_measures
 
 
-def get_strongest_trade_relationships(graph: nx.DiGraph, n: int = 20) -> List[Tuple[str, str, float]]:
+def get_strongest_trade_relations(graph: nx.DiGraph, n: int = 20) -> List[Tuple[str, str, float]]:
     """Identify the strongest bilateral trade relationships.
 
     Args:
@@ -181,6 +193,9 @@ def get_strongest_trade_relationships(graph: nx.DiGraph, n: int = 20) -> List[Tu
     Returns:
         A list of (exporter_name, importer_name, trade_value) tuples,
         sorted by trade value in descending order
+
+    Preconditions:
+        - 1 <= n <= len(graph)
     """
     # Get all edges from the graph with their trade values
     trade_relationships = []
@@ -202,7 +217,7 @@ def get_strongest_trade_relationships(graph: nx.DiGraph, n: int = 20) -> List[Tu
     return trade_relationships[:n]
 
 
-def identify_trade_communities(graph: nx.Graph) -> dict:
+def identify_trade_communities(graph: nx.DiGraph) -> dict:
     """Detect communities in the trade network using the Louvain algorithm.
 
     Note: Requires converting the directed graph to undirected for community detection.
@@ -213,11 +228,12 @@ def identify_trade_communities(graph: nx.Graph) -> dict:
     Returns:
         A dictionary mapping node IDs to community IDs
     """
+
     # Convert directed graph to undirected for community detection
-    undirected_graph = graph.to_undirected()
+    undirected_graph = build_undirected_version(graph)
 
     # Use the Louvain method for community detection
-    partition = community_louvain.best_partition(undirected_graph, weight='weight')
+    partition = community_louvain.best_partition(undirected_graph, weight='weight', random_state=FIXED_SEED)
 
     # Count the number of communities
     num_communities = len(set(partition.values()))
@@ -245,7 +261,8 @@ def calculate_trade_dependencies(graph: nx.DiGraph, gdp_data: dict = None) -> di
 
         # Calculate export concentration (Herfindahl-Hirschman Index)
         if total_exports > 0:
-            export_shares = [(edge[2].get('weight', edge[2].get('value', 0)) / total_exports) ** 2 for edge in export_edges]
+            export_shares = [(edge[2].get('weight', edge[2].get('value', 0)) / total_exports) ** 2
+                             for edge in export_edges]
             export_concentration = sum(export_shares)
         else:
             export_concentration = 0
@@ -256,7 +273,8 @@ def calculate_trade_dependencies(graph: nx.DiGraph, gdp_data: dict = None) -> di
 
         # Calculate import concentration (Herfindahl-Hirschman Index)
         if total_imports > 0:
-            import_shares = [(edge[2].get('weight', edge[2].get('value', 0)) / total_imports) ** 2 for edge in import_edges]
+            import_shares = [(edge[2].get('weight', edge[2].get('value', 0)) / total_imports) ** 2
+                             for edge in import_edges]
             import_concentration = sum(import_shares)
         else:
             import_concentration = 0
@@ -322,9 +340,11 @@ if __name__ == '__main__':
     doctest.testmod()
 
     import python_ta
+
+    # Disable R0914 error if you don't want to decrease number of local variables
     python_ta.check_all(config={
-        'extra-imports': ['pandas', 'networkx', 'typing'],
+        'extra-imports': ['pandas', 'networkx', 'typing', 'community', 'graph_builder'],
         'allowed-io': ['identify_trade_communities'],
-        'max-line-length': 100,
+        'max-line-length': 120,
         'disable': ['R1705', 'C0200']
     })
