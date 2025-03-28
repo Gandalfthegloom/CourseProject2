@@ -876,6 +876,92 @@ def prepare_centrality_table_data(graph, analysis_results, centrality_type='eige
     return table_data
 
 
+def format_country_dependency_metrics(graph: nx.DiGraph, country_id: str, gdp_data: Optional[pd.DataFrame] = None):
+    """Format trade dependency metrics for a specific country into a structured format for the dashboard.
+
+    Args:
+        graph: NetworkX DiGraph containing the trade network
+        country_id: The country ID to generate metrics for
+        gdp_data: Optional DataFrame with GDP data
+
+    Returns:
+        A tuple containing (general_metrics, export_partners, import_partners) formatted for display
+    """
+    from analysis import calculate_trade_dependencies
+
+    # Check if country_id is valid
+    if country_id not in graph.nodes:
+        print(f"Warning: Country ID {country_id} not found in graph")
+        return None, None, None
+
+    # Get country name
+    country_name = graph.nodes[country_id]['name']
+
+    try:
+        # Calculate dependency metrics for all countries (or just this one if we could optimize)
+        dependency_metrics = calculate_trade_dependencies(graph,
+                                                          gdp_data.set_index('country_code').to_dict()['gdp_2023']
+                                                          if gdp_data is not None else None)
+
+        # Extract metrics for the selected country
+        if country_id not in dependency_metrics:
+            print(f"Warning: No dependency metrics calculated for {country_name} ({country_id})")
+            return None, None, None
+
+        metrics = dependency_metrics[country_id]
+
+        # Format general metrics for display
+        general_metrics = [
+            {"Metric": "Total Exports", "Value": f"${metrics['total_exports']:,.2f}"},
+            {"Metric": "Total Imports", "Value": f"${metrics['total_imports']:,.2f}"},
+            {"Metric": "Trade Balance", "Value": f"${metrics['trade_balance']:,.2f}"},
+            {"Metric": "Export Concentration Index (HHI)",
+             "Value": f"{metrics['export_concentration']:.4f}" if metrics[
+                                                                      'export_concentration'] is not None else "N/A"},
+            {"Metric": "Import Concentration Index (HHI)",
+             "Value": f"{metrics['import_concentration']:.4f}" if metrics[
+                                                                      'import_concentration'] is not None else "N/A"},
+            {"Metric": "Trade Vulnerability Index",
+             "Value": f"{metrics['vulnerability_index']:.4f}" if metrics['vulnerability_index'] is not None else "N/A"},
+            {"Metric": "Trade Diversity Score",
+             "Value": f"{metrics['trade_diversity']:.4f}" if metrics['trade_diversity'] is not None else "N/A"}
+        ]
+
+        # Add trade to GDP ratio if available
+        if 'trade_to_gdp' in metrics and metrics['trade_to_gdp'] is not None:
+            general_metrics.append({"Metric": "Trade to GDP Ratio", "Value": f"{metrics['trade_to_gdp']:.2%}"})
+
+        # Format top export partners
+        export_partners = []
+        if 'top_export_partners' in metrics and metrics['top_export_partners']:
+            for i, (partner_id, value, share) in enumerate(metrics['top_export_partners']):
+                partner_name = graph.nodes[partner_id]['name'] if partner_id in graph.nodes else partner_id
+                export_partners.append({
+                    "Rank": i + 1,
+                    "Country": partner_name,
+                    "Export Value": f"${value:,.2f}",
+                    "Share of Exports": f"{share:.2%}"
+                })
+
+        # Format top import partners
+        import_partners = []
+        if 'top_import_partners' in metrics and metrics['top_import_partners']:
+            for i, (partner_id, value, share) in enumerate(metrics['top_import_partners']):
+                partner_name = graph.nodes[partner_id]['name'] if partner_id in graph.nodes else partner_id
+                import_partners.append({
+                    "Rank": i + 1,
+                    "Country": partner_name,
+                    "Import Value": f"${value:,.2f}",
+                    "Share of Imports": f"{share:.2%}"
+                })
+
+        return general_metrics, export_partners, import_partners
+
+    except Exception as e:
+        print(f"Error calculating dependency metrics for {country_name} ({country_id}): {str(e)}")
+        return None, None, None
+
+
 def create_dashboard(
         filtered_graph: nx.DiGraph,
         graph: nx.DiGraph,
@@ -1206,38 +1292,294 @@ def create_dashboard(
                 })
             ])
 
+
         elif tab == 'country-trade':
+
             # Regenerate countries list within the callback to avoid scope issues
+
             current_countries = [(node_id, data['name']) for node_id, data in filtered_graph.nodes(data=True)]
+
             current_countries.sort(key=lambda x: x[1])  # Sort by country name
 
             # Find the ID for Afghanistan (or first country if Afghanistan not found)
+
             current_default = next((id_ for id_, name in current_countries if name.lower() == 'afghanistan'),
-                                  current_countries[0][0] if current_countries else None)
+
+                                   current_countries[0][0] if current_countries else None)
+
+            # Pre-generate the dependency tables for the default country
+
+            country_name = graph.nodes[current_default]['name'] if current_default in graph.nodes else "Unknown Country"
+
+            general_metrics, export_partners, import_partners = format_country_dependency_metrics(
+
+                graph, current_default, gdp_data
+
+            )
+
+            # Define table styles for initial rendering
+
+            table_style = {
+
+                'overflowX': 'auto',
+
+                'backgroundColor': 'white',
+
+                'border': '1px solid #ddd',
+
+                'borderRadius': '8px',
+
+                'boxShadow': '0 4px 6px rgba(0,0,0,0.1)',
+
+                'margin': '20px 0',
+
+                'width': '100%'
+
+            }
+
+            header_style = {
+
+                'backgroundColor': '#3498db',
+
+                'color': 'white',
+
+                'textAlign': 'center',
+
+                'fontWeight': 'bold',
+
+                'padding': '12px 15px'
+
+            }
+
+            cell_style = {
+
+                'textAlign': 'center',
+
+                'padding': '12px 15px',
+
+                'borderBottom': '1px solid #ddd'
+
+            }
+
+            # Build initial dependency tables content
+
+            initial_tables = html.Div([
+
+                html.H3(f"Trade Dependency Metrics for {country_name}",
+
+                        style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '25px'}),
+
+                # General metrics table
+
+                html.Div([
+
+                    html.H4("General Trade Metrics",
+
+                            style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+
+                    html.P(
+
+                        "Key metrics about trade volume, concentration, and vulnerability.",
+
+                        style={'textAlign': 'center', 'marginBottom': '15px', 'fontStyle': 'italic'}
+
+                    ),
+
+                    dash_table.DataTable(
+
+                        columns=[{'name': col, 'id': col} for col in ['Metric', 'Value']],
+
+                        data=general_metrics if general_metrics else [],
+
+                        style_table=table_style,
+
+                        style_header=header_style,
+
+                        style_cell=cell_style,
+
+                        style_data_conditional=[
+
+                            {
+
+                                'if': {'row_index': 'odd'},
+
+                                'backgroundColor': 'rgb(248, 248, 248)'
+
+                            }
+
+                        ]
+
+                    )
+
+                ], style={'marginBottom': '30px'}),
+
+                # Top trading partners section with two tables side by side
+
+                html.Div([
+
+                    html.H4("Top Trading Partners",
+
+                            style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+
+                    html.Div([
+
+                        # Left column - Top Export Partners
+
+                        html.Div([
+
+                            html.H5("Top Export Destinations",
+
+                                    style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+
+                            dash_table.DataTable(
+
+                                columns=[{'name': col, 'id': col} for col in
+
+                                         ['Rank', 'Country', 'Export Value', 'Share of Exports']],
+
+                                data=export_partners if export_partners else [],
+
+                                style_table=table_style,
+
+                                style_header=header_style,
+
+                                style_cell=cell_style,
+
+                                style_data_conditional=[
+
+                                    {
+
+                                        'if': {'row_index': 'odd'},
+
+                                        'backgroundColor': 'rgb(248, 248, 248)'
+
+                                    }
+
+                                ]
+
+                            )
+
+                        ], style={'width': '48%', 'display': 'inline-block', 'verticalAlign': 'top'}),
+
+                        # Right column - Top Import Partners
+
+                        html.Div([
+
+                            html.H5("Top Import Sources",
+
+                                    style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+
+                            dash_table.DataTable(
+
+                                columns=[{'name': col, 'id': col} for col in
+
+                                         ['Rank', 'Country', 'Import Value', 'Share of Imports']],
+
+                                data=import_partners if import_partners else [],
+
+                                style_table=table_style,
+
+                                style_header=header_style,
+
+                                style_cell=cell_style,
+
+                                style_data_conditional=[
+
+                                    {
+
+                                        'if': {'row_index': 'odd'},
+
+                                        'backgroundColor': 'rgb(248, 248, 248)'
+
+                                    }
+
+                                ]
+
+                            )
+
+                        ], style={'width': '48%', 'display': 'inline-block', 'verticalAlign': 'top',
+                                  'marginLeft': '4%'})
+
+                    ])
+
+                ], style={'marginBottom': '30px'})
+
+            ]) if general_metrics else html.Div("No trade dependency metrics available for this country.")
 
             return html.Div([
+
                 html.H2("Country-Specific Trade Relationships",
+
                         style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '20px'}),
+
                 html.Div([
+
                     html.Label("Select a Country:",
+
                                style={'fontWeight': 'bold', 'marginRight': '10px', 'fontSize': '0.95 em'}),
+
                     dcc.Dropdown(
+
                         id='country-dropdown',
-                        options=[{'label': f'{get_flag_emoji(name)} {name}', 'value': id_} for id_, name in current_countries],
+
+                        options=[{'label': f'{get_flag_emoji(name)} {name}', 'value': id_} for id_, name in
+
+                                 current_countries],
+
                         value=current_default,  # Set default to Afghanistan or first country
+
                         style={'width': '50%', 'margin': '0 auto'}
+
                     )
+
                 ], style={'textAlign': 'center', 'marginBottom': '20px'}),
+
                 dcc.Graph(id='country-trade-graph',
+
                           figure=visualize_country_trade(graph, current_default, country_coords, analysis_results),
+
                           style={
+
                               'height': '70vh',
+
                               'width': '90%',
+
                               'marginLeft': 'auto',
+
                               'marginRight': 'auto',
+
                               'marginBottom': '40px'
+
                           }
-                          )
+
+                          ),
+
+                # New section for trade dependency metrics tables
+
+                html.Div(id='country-dependency-tables',
+
+                         children=initial_tables,  # Include pre-generated tables
+
+                         style={
+
+                             'backgroundColor': 'rgba(255, 255, 255, 0.8)',
+
+                             'borderRadius': '10px',
+
+                             'padding': '20px',
+
+                             'boxShadow': '0 4px 8px rgba(0,0,0,0.1)',
+
+                             'marginBottom': '50px',
+
+                             'width': '90%',
+
+                             'marginLeft': 'auto',
+
+                             'marginRight': 'auto'
+
+                         })
+
             ])
 
         elif tab == 'trade-metrics':
@@ -1288,7 +1630,7 @@ def create_dashboard(
     @app.callback(
         Output('country-trade-graph', 'figure'),
         [Input('country-dropdown', 'value')],
-        prevent_initial_call=True
+        prevent_initial_call=False
     )
     def update_country_trade_graph(selected_country):
         """Update the graph for a specific country's trade details."""
@@ -1316,6 +1658,129 @@ def create_dashboard(
             titles[selected_metric],
             gdp_data
         )
+
+    @app.callback(
+        Output('country-dependency-tables', 'children'),
+        [Input('country-dropdown', 'value')],
+        prevent_initial_call=False
+    )
+    def update_country_dependency_tables(selected_country):
+        '''Update the dependency metrics tables based on the selected country.'''
+        if not selected_country:
+            # If no country is selected (shouldn't happen with default value set)
+            return html.Div("Please select a country to view its trade metrics.")
+
+        # Get country name
+        country_name = graph.nodes[selected_country]['name'] if selected_country in graph.nodes else "Unknown Country"
+
+        # Format metrics data for tables
+        general_metrics, export_partners, import_partners = format_country_dependency_metrics(
+            graph, selected_country, gdp_data
+        )
+
+        if not general_metrics:
+            return html.Div("No trade dependency metrics available for this country.")
+
+        # Define table styles
+        table_style = {
+            'overflowX': 'auto',
+            'backgroundColor': 'white',
+            'border': '1px solid #ddd',
+            'borderRadius': '8px',
+            'boxShadow': '0 4px 6px rgba(0,0,0,0.1)',
+            'margin': '20px 0',
+            'width': '100%'
+        }
+
+        header_style = {
+            'backgroundColor': '#3498db',
+            'color': 'white',
+            'textAlign': 'center',
+            'fontWeight': 'bold',
+            'padding': '12px 15px'
+        }
+
+        cell_style = {
+            'textAlign': 'center',
+            'padding': '12px 15px',
+            'borderBottom': '1px solid #ddd'
+        }
+
+        # Create the tables
+        return html.Div([
+            html.H3(f"Trade Dependency Metrics for {country_name}",
+                    style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '25px'}),
+
+            # General metrics table
+            html.Div([
+                html.H4("General Trade Metrics",
+                        style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+                html.P(
+                    "Key metrics about trade volume, concentration, and vulnerability.",
+                    style={'textAlign': 'center', 'marginBottom': '15px', 'fontStyle': 'italic'}
+                ),
+                dash_table.DataTable(
+                    columns=[{'name': col, 'id': col} for col in ['Metric', 'Value']],
+                    data=general_metrics,
+                    style_table=table_style,
+                    style_header=header_style,
+                    style_cell=cell_style,
+                    style_data_conditional=[
+                        {
+                            'if': {'row_index': 'odd'},
+                            'backgroundColor': 'rgb(248, 248, 248)'
+                        }
+                    ]
+                )
+            ], style={'marginBottom': '30px'}),
+
+            # Top trading partners section with two tables side by side
+            html.Div([
+                html.H4("Top Trading Partners",
+                        style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+                html.Div([
+                    # Left column - Top Export Partners
+                    html.Div([
+                        html.H5("Top Export Destinations",
+                                style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+                        dash_table.DataTable(
+                            columns=[{'name': col, 'id': col} for col in
+                                     ['Rank', 'Country', 'Export Value', 'Share of Exports']],
+                            data=export_partners,
+                            style_table=table_style,
+                            style_header=header_style,
+                            style_cell=cell_style,
+                            style_data_conditional=[
+                                {
+                                    'if': {'row_index': 'odd'},
+                                    'backgroundColor': 'rgb(248, 248, 248)'
+                                }
+                            ]
+                        )
+                    ], style={'width': '48%', 'display': 'inline-block', 'verticalAlign': 'top'}),
+
+                    # Right column - Top Import Partners
+                    html.Div([
+                        html.H5("Top Import Sources",
+                                style={'textAlign': 'center', 'color': '#2980b9', 'marginBottom': '15px'}),
+                        dash_table.DataTable(
+                            columns=[{'name': col, 'id': col} for col in
+                                     ['Rank', 'Country', 'Import Value', 'Share of Imports']],
+                            data=import_partners,
+                            style_table=table_style,
+                            style_header=header_style,
+                            style_cell=cell_style,
+                            style_data_conditional=[
+                                {
+                                    'if': {'row_index': 'odd'},
+                                    'backgroundColor': 'rgb(248, 248, 248)'
+                                }
+                            ]
+                        )
+                    ], style={'width': '48%', 'display': 'inline-block', 'verticalAlign': 'top', 'marginLeft': '4%'})
+                ])
+            ], style={'marginBottom': '30px'})
+        ])
 
     # Configure the app to enable callback exceptions
     app.config.suppress_callback_exceptions = True
