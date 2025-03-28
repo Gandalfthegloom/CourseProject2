@@ -41,7 +41,7 @@ def create_trade_visualization(
 
             # Calculate node size based on total trade volume
             total_trade = data['total_exports'] + data['total_imports']
-            node_size = 7 + (total_trade / 1e9) ** 0.49  # Hybrid scaling
+            node_size = 7 + (total_trade / 1e9) ** 0.49  # Hybrid scaling ftw
 
             # Calculate node color based on trade balance
             trade_balance = data['total_exports'] - data['total_imports']
@@ -78,7 +78,21 @@ def create_trade_visualization(
             cmin=-1,
             cmax=1,
             colorbar=dict(
-                title="Trade Balance Ratio<br>(Exports-Imports)/(Exports+Imports)"
+                title=dict(
+                    text="Trade Balance Ratio<br>(Exports-Imports)/(Exports+Imports)",
+                    font=dict(size=12),
+                    side="right"
+                ),
+                thickness=15,
+                len=0.5,
+                y=0.5,
+                yanchor="middle",
+                x=1.02,
+                xanchor="left",
+                outlinewidth=1,
+                outlinecolor="black",
+                tickvals=[-1, -0.5, 0, 0.5, 1],
+                ticktext=["-1", "-0.5", "0", "0.5", "1"]
             ),
             line=dict(width=1, color='black')
         ),
@@ -98,13 +112,13 @@ def create_trade_visualization(
                 country_edges[source_name] = []
             country_edges[source_name].append((source_name, target_name, data['value']))
 
-    # Get top 5 trading partners for each country
+    # Get top x trading partners for each country
     top_edges = []
     for country, edges in country_edges.items():
         # Sort edges for this country by value
         edges.sort(key=lambda x: x[2], reverse=True)
         # Take top 5 or fewer if less than 5 exist
-        top_country_edges = edges[:5]
+        top_country_edges = edges[:100]
         top_edges.extend(top_country_edges)
 
     # Add arrows for each top trade relationship
@@ -160,6 +174,8 @@ def visualize_country_trade(
     fig = go.Figure()
 
     country_name = graph.nodes[country_id]['name']
+    total_exports = graph.nodes[country_id]['total_exports']
+    total_imports = graph.nodes[country_id]['total_imports']
 
     # Create a mapping of country names to coordinates
     country_coord_map = dict(zip(country_coords['country'],
@@ -193,24 +209,30 @@ def visualize_country_trade(
     export_lons = []
     export_texts = []
     export_values = []
+    export_sizes = []
 
     for _, target in graph.out_edges(country_id):
         target_name = graph.nodes[target]['name']
         if target_name in country_coord_map:
             target_lat, target_lon = country_coord_map[target_name]
             value = graph.edges[country_id, target]['value']
+            size = 12 + (500 * value / total_exports) ** 0.7  # for node size
 
             export_lats.append(target_lat)
             export_lons.append(target_lon)
             export_texts.append(f"<b>Export to {target_name}</b><br>Value: ${value:,.2f}")
             export_values.append(value)
+            export_sizes.append(size)
+
+            # Calculate edge weight (line thickness) based on value
+            weight = 0.15 + (value / 1e7) ** 0.2
 
             # Add arrow for this trade relationship
             plot_trade_arrow(
                 fig,
                 selected_lat, selected_lon,
                 target_lat, target_lon,
-                np.log1p(value) * 0.5,
+                weight,
                 'rgba(255, 50, 50, 0.6)',  # Red for exports
                 f"<b>Export</b><br>{country_name} → {target_name}<br>Value: ${value:,.2f}"
             )
@@ -220,24 +242,29 @@ def visualize_country_trade(
     import_lons = []
     import_texts = []
     import_values = []
+    import_sizes = []
 
     for source, _ in graph.in_edges(country_id):
         source_name = graph.nodes[source]['name']
         if source_name in country_coord_map:
             source_lat, source_lon = country_coord_map[source_name]
             value = graph.edges[source, country_id]['value']
+            size = 12 + (500 * value / total_imports) ** 0.7  # for node size
 
             import_lats.append(source_lat)
             import_lons.append(source_lon)
             import_texts.append(f"<b>Import from {source_name}</b><br>Value: ${value:,.2f}")
             import_values.append(value)
+            import_sizes.append(size)
+
+            weight = 0.15 + (value / 1e7) ** 0.2
 
             # Add arrow for this trade relationship
             plot_trade_arrow(
                 fig,
                 source_lat, source_lon,
                 selected_lat, selected_lon,
-                np.log1p(value) * 0.5,
+                weight,
                 'rgba(50, 50, 255, 0.6)',  # Blue for imports
                 f"<b>Import</b><br>{source_name} → {country_name}<br>Value: ${value:,.2f}"
             )
@@ -250,7 +277,7 @@ def visualize_country_trade(
             text=export_texts,
             mode='markers',
             marker=dict(
-                size=np.log1p(export_values) * 2,
+                size=export_sizes,
                 color='red',
                 line=dict(width=1, color='black')
             ),
@@ -266,7 +293,7 @@ def visualize_country_trade(
             text=import_texts,
             mode='markers',
             marker=dict(
-                size=np.log1p(import_values) * 2,
+                size=import_sizes,
                 color='blue',
                 line=dict(width=1, color='black')
             ),
@@ -631,7 +658,6 @@ def create_dashboard(
                         'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css'
                     ])
 
-    # Define the overall app layout with a modern, full-screen design
     app.layout = html.Div([
         # Full-screen header with gradient and shadow
         html.Header([
@@ -657,7 +683,6 @@ def create_dashboard(
 
         # Full-screen content container
         html.Div([
-            # Dynamic tabs with modern styling
             dcc.Tabs(id='main-tabs', value='global-network',  # Set default value to 'global-network'
                      style={'width': '100%', 'display': 'flex', 'justifyContent': 'center'},
                      children=[
@@ -703,12 +728,12 @@ def create_dashboard(
                 'padding': '20px',
                 'background': 'linear-gradient(to bottom right, #f0f4f8, #e6f2ff)',
                 'minHeight': 'calc(100vh - 250px)',  # Increased bottom space
-                'overflowY': 'auto'
-
+                'width': '100%'
             })
         ], style={
-            'height': 'calc(100vh - 100px)',  # Adjusted to allow scrolling
-            'overflowY': 'auto'  # Enable vertical scrolling for entire content
+            'height': 'calc(100vh - 100px)',
+            'width': '100%',
+            'overflowY': 'auto'  # Only one scrollbar for the entire content
         })
     ],
         style={
@@ -768,10 +793,10 @@ def create_dashboard(
                           figure=visualize_country_trade(graph, default_country, country_coords, analysis_results),
                           style={
                               'height': '70vh',
-                              'width': '95%',
+                              'width': '90%',
                               'marginLeft': 'auto',
                               'marginRight': 'auto',
-                              'marginBottom': '100px'
+                              'marginBottom': '40px'
                           }
                           )
             ])
