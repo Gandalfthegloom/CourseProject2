@@ -5,10 +5,11 @@ This module contains functions for loading and processing the preprocessed trade
 It handles the cleaning, filtering, and preparation of data for graph construction.
 """
 
-import os
 import json
 import pandas as pd
 import plotly.express as px
+
+EXTRA_COUNTRY_COORDINATES_FILE = 'Data/extra_country_coords.json'  # JSON file for extra country coordinates
 
 
 def load_trade_data(file_path: str) -> pd.DataFrame:
@@ -42,15 +43,25 @@ def load_trade_data(file_path: str) -> pd.DataFrame:
     return df
 
 
-def get_country_coordinates() -> pd.DataFrame:
+def get_country_coordinates(extra_path: str = EXTRA_COUNTRY_COORDINATES_FILE) -> pd.DataFrame:
     """Generate a mapping of country IDs to their geographical coordinates.
 
     This function creates a DataFrame mapping each country name to its latitude and longitude
     coordinates for visualization on a world map. It uses Gapminder's centroids (141 countries)
-    and appends extra coordinates (for the remaining countries from the trade data) from an external JSON file.
+    and appends extra coordinates (for the remaining countries from the trade data) from extra_coordinates.
+
+    Args:
+        extra_path: A JSON file that contains extra country coordinates not covered
+                    by Gapminder's centroids.
 
     Returns:
         A DataFrame with columns 'country', 'centroid_lat', and 'centroid_lon'.
+
+    Preconditions:
+        - extra_path refers to a valid JSON file with the format of dict[str, dict]
+        - Let extra_coords be the loaded version of the JSON file extra_path.
+          pd.DataFrame.from_dict(extra_coords, orient='index') is a DataFrame with the expected columns:
+          'country', 'centroid_lat', 'centroid_lon'
     """
 
     # Load gapminder centroids
@@ -80,8 +91,7 @@ def get_country_coordinates() -> pd.DataFrame:
         else:
             print(f"Warning: {gap_name} not found in gapminder dataset")
 
-    # Load extra coordinates from the JSON file located in the "Data" folder
-    extra_path = os.path.join(os.path.dirname(__file__), 'Data', 'extra_country_coords.json')
+    # Load extra coordinates from the JSON file
     with open(extra_path, 'r', encoding='utf-8') as f:
         extra_coords = json.load(f)
     extra_df = pd.DataFrame.from_dict(extra_coords, orient='index')
@@ -141,7 +151,7 @@ if __name__ == '__main__':
 
     import python_ta
     python_ta.check_all(config={
-        'extra-imports': ['pandas', 'plotly.express', 'os', 'json'],
+        'extra-imports': ['pandas', 'plotly.express', 'json'],
         "forbidden-io-functions": [],
         'max-line-length': 120,
         'disable': ['R1705', 'C0200']
