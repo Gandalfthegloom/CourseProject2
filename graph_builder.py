@@ -1,16 +1,15 @@
 """
 CSC111 Project 2: Global Trade Interdependence - Graph Builder
 
-This module defines a Graph class for building a trade network graph and a Vertex class
-to represent each country with its export and import relationships. The build_trade_graph
-function constructs the graph from processed trade data.
+This module provides a few functions that is related to building trade graph
+based on the given trade data.
 """
 
 from typing import Any
 import pandas as pd
 import networkx as nx
 
-DISP_FILTER_ALPHA_SIG = float(1e-12)  # alpha significance for disparity filter
+DISP_FILTER_ALPHA_SIG = 1e-9  # alpha significance for disparity filter
 
 
 def build_trade_graph(trade_data: pd.DataFrame) -> nx.DiGraph:
@@ -75,12 +74,17 @@ def build_trade_graph(trade_data: pd.DataFrame) -> nx.DiGraph:
 
 def build_undirected_version(graph_original: nx.DiGraph) -> nx.Graph:
     """
-    Returns the undirected version of graph_original, which is the trade graph. Here, all edges that connect the
+    Returns the undirected version of graph_original. Here, all edges that connect the
     same pair of vertices will be merged by adding their value and weight.
+
+    Preconditions:
+        - For all edges in graph_original.edges(data=True), the edge must have these following attributes:
+          'value', 'weight'
     """
-    # Construct an undirected version of graph_original
+    # Create an undirected graph
     graph_bi = nx.Graph()
     graph_bi.add_nodes_from(graph_original.nodes(data=True))  # Copy the information of all vertices
+
     for vertex in graph_original.nodes:
         for nbr in graph_original.neighbors(vertex):  # iterate over out-neighbors
             # Check if the reciprocal edge exists
@@ -127,7 +131,8 @@ def build_sparse_trade_graph(trade_data: pd.DataFrame, alpha_sig: float = DISP_F
 
     def add_edge_to_graph(node_from: Any, node_to: Any) -> None:
         """
-        Add edges from graph_original to graph.
+        Add edge(s) to graph that connects node_from with node_to.
+        Edge(s) used is derived from graph_original.
 
         Preconditions:
             - node_from in graph_original.nodes

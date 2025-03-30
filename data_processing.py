@@ -1,4 +1,5 @@
-"""CSC111 Project 2: Global Trade Interdependence - Data Processing
+"""
+CSC111 Project 2: Global Trade Interdependence - Data Processing
 
 This module contains functions for loading and processing the preprocessed trade data.
 It handles the cleaning, filtering, and preparation of data for graph construction.
@@ -132,53 +133,6 @@ def load_gdp_data(file_path: str) -> pd.DataFrame:
     print(f"Successfully loaded GDP data for {len(df)} countries")
 
     return df
-
-
-def filter_by_trade_volume(data: pd.DataFrame, min_value: float) -> pd.DataFrame:
-    """Filter the trade data to include only relationships above a certain value threshold.
-
-    Args:
-        data: The trade data DataFrame
-        min_value: The minimum trade value (in USD) to include
-
-    Returns:
-        A filtered DataFrame containing only the trade relationships above the threshold
-
-    Preconditions:
-        - data is a pd.DataFrame instance with the expected columns:
-          'exporter_id', 'exporter_name', 'importer_id', 'importer_name', 'value'
-        - min_value > 0
-    """
-    # Filter the DataFrame based on the 'value' column
-    filtered_data = data[data['value'] >= min_value]
-    print(f"Filtered data from {len(data)} to {len(filtered_data)} trade relationships")
-    return filtered_data
-
-
-def get_top_trading_partners(data: pd.DataFrame, country_id: str, limit: int = 10) -> pd.DataFrame:
-    """Get the top trading partners for a specific country.
-
-    Args:
-        data: The trade data DataFrame
-        country_id: The ID of the country to find partners for
-        limit: The number of top partners to return
-
-    Returns:
-        A DataFrame with the size of limit containing the top trading partners sorted by trade value
-
-    Preconditions:
-        - data is a pd.DataFrame instance with the expected columns:
-          'exporter_id', 'exporter_name', 'importer_id', 'importer_name', 'value'
-        - country_id in data['exporter_id']
-        - limit >= 1
-    """
-    # Filter for exports from the specified country
-    exports = data[data['exporter_id'] == country_id].copy()
-
-    # Sort by value in descending order and take the top n
-    top_partners = exports.sort_values('value', ascending=False).head(limit)
-
-    return top_partners
 
 
 if __name__ == '__main__':

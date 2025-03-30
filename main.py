@@ -1,5 +1,5 @@
 """
-CSC111 Winter 2025: Global Trade Interdependence Visualization
+CSC111 Winter 2025 Project 2: Global Trade Interdependence Visualization
 
 This module serves as the main entry point for running the Global Trade Interdependence
 visualization program. It integrates components for data processing, graph building,

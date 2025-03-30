@@ -1,4 +1,5 @@
-"""CSC111 Project 2: Global Trade Interdependence - Network Analysis
+"""
+CSC111 Project 2: Global Trade Interdependence - Network Analysis
 
 This module contains functions for analyzing the trade network graph and extracting
 meaningful insights about global trade patterns and dependencies.
@@ -26,6 +27,12 @@ def analyze_trade_network(graph: nx.DiGraph) -> Dict[str, Any]:
         - 'centrality_measures': Dictionary of various centrality metrics
         - 'strongest_relationships': List of (exporter, importer, value) representing strongest trade ties
         - 'trade_communities': List of country groupings that form trade communities
+
+    Preconditions:
+        - For all vertices in graph.nodes(data=True), the vertex must have the following attributes:
+          'name', 'total_exports', 'total_imports'
+        - For all edges in graph.edges(data=True), the edge must have the following attributes:
+          'value', 'weight'
     """
     # Orchestrate the various analysis functions
     # Compile results into a single dictionary
@@ -51,6 +58,10 @@ def get_top_exporters(graph: nx.DiGraph, n: int = 20) -> List[Tuple[str, float]]
         A list of (country_name, export_value) tuples, sorted by export value in descending order
 
     Preconditions:
+        - For all vertices in graph.nodes(data=True), the vertex must have the following attributes:
+          'name', 'total_exports', 'total_imports'
+        - For all edges in graph.edges(data=True), the edge must have the following attributes:
+          'value', 'weight'
         - 1 <= n <= len(graph)
     """
     # Calculate total exports for each country node
@@ -83,6 +94,10 @@ def get_top_importers(graph: nx.DiGraph, n: int = 20) -> List[Tuple[str, float]]
         A list of (country_name, import_value) tuples, sorted by import value in descending order
 
     Preconditions:
+        - For all vertices in graph.nodes(data=True), the vertex must have the following attributes:
+          'name', 'total_exports', 'total_imports'
+        - For all edges in graph.edges(data=True), the edge must have the following attributes:
+          'value', 'weight'
         - 1 <= n <= len(graph)
     """
     # Calculate total imports for each country node
@@ -112,6 +127,12 @@ def calculate_trade_balance(graph: nx.DiGraph) -> Dict[str, float]:
 
     Returns:
         A dictionary mapping country IDs to their trade balance values
+
+    Preconditions:
+        - For all vertices in graph.nodes(data=True), the vertex must have the following attributes:
+          'name', 'total_exports', 'total_imports'
+        - For all edges in graph.edges(data=True), the edge must have the following attributes:
+          'value', 'weight'
     """
     # For each country, calculate total exports and imports
     trade_balance = {}
@@ -133,17 +154,18 @@ def calculate_trade_balance(graph: nx.DiGraph) -> Dict[str, float]:
 
 
 def calculate_centrality_measures(graph: nx.DiGraph) -> dict:
-    """Calculate various centrality measures for nodes in the trade network.
-
-    IMPORTANT NOTE: We cannot use betweenness centrality and closeness centrality, as both centrality methods
-    are related to "shortest path", while our dataset is NOT a trade route, but rather a trade relation. Thus,
-    no routes or "shortest paths" are involved.
+    """Calculate various centrality measures for nodes in the trade network, such as in-degree, out-degree, and
+    eigenvector centrality.
 
     Args:
         graph: A directed graph representing the global trade network
 
     Returns:
         A dictionary mapping country nodes to dictionaries of their centrality metrics
+
+    Preconditions:
+        - For all edges in graph.edges(data=True), the edge must have the following attributes:
+          'value', 'weight'
     """
     centrality_measures = {}
 
@@ -152,10 +174,6 @@ def calculate_centrality_measures(graph: nx.DiGraph) -> dict:
     in_degree = nx.in_degree_centrality(graph)  # Importance as an importer
     out_degree = nx.out_degree_centrality(graph)  # Importance as an exporter
 
-    # Betweenness centrality - measures how often a node appears on shortest paths
-    # Countries with high betweenness are important trade intermediaries
-    # betweenness = nx.betweenness_centrality(graph, weight='weight')
-
     # Eigenvector centrality - measures connection to important nodes
     # Countries with high eigenvector centrality trade with other important countries
     try:
@@ -163,21 +181,12 @@ def calculate_centrality_measures(graph: nx.DiGraph) -> dict:
     except nx.PowerIterationFailedConvergence:
         eigenvector = nx.eigenvector_centrality_numpy(graph, weight='weight')
 
-    # Add closeness centrality - measures how close a node is to all other nodes
-    # Countries with high closeness centrality have short paths to many other countries
-    # try:
-    #     closeness = nx.closeness_centrality(graph, distance='weight')
-    # except (nx.NetworkXError, ZeroDivisionError):
-    #     closeness = {node: 0.0 for node in graph.nodes()}
-
     # Combine all measures into a single dictionary
     for node in graph.nodes():
         centrality_measures[node] = {
             'in_degree': in_degree.get(node, 0),
             'out_degree': out_degree.get(node, 0),
-            # 'betweenness': betweenness.get(node, 0),
-            'eigenvector': eigenvector.get(node, 0),
-            # 'closeness': closeness.get(node, 0)
+            'eigenvector': eigenvector.get(node, 0)
         }
 
     return centrality_measures
@@ -195,6 +204,10 @@ def get_strongest_trade_relations(graph: nx.DiGraph, n: int = 20) -> List[Tuple[
         sorted by trade value in descending order
 
     Preconditions:
+        - For all vertices in graph.nodes(data=True), the vertex must have the following attributes:
+          'name', 'total_exports', 'total_imports'
+        - For all edges in graph.edges(data=True), the edge must have the following attributes:
+          'value', 'weight'
         - 1 <= n <= len(graph)
     """
     # Get all edges from the graph with their trade values
@@ -227,6 +240,10 @@ def identify_trade_communities(graph: nx.DiGraph) -> dict:
 
     Returns:
         A dictionary mapping node IDs to community IDs
+
+    Preconditions:
+        - For all edges in graph.edges(data=True), the edge must have the following attributes:
+          'value', 'weight'
     """
 
     # Convert directed graph to undirected for community detection
@@ -251,6 +268,10 @@ def calculate_trade_dependencies(graph: nx.DiGraph, gdp_data: dict = None) -> di
 
     Returns:
         A dictionary with trade dependency metrics for each country
+
+    Preconditions:
+        - For all edges in graph.edges(data=True), the edge must have the following attributes:
+          'value', 'weight'
     """
     dependency_metrics = {}
 
