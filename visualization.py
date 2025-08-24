@@ -1791,7 +1791,11 @@ def create_dashboard(
     app.config.suppress_callback_exceptions = True
 
     print("Starting trade dashboard! Navigate to http://127.0.0.1:8050/ to explore global trade!")
-    app.run(debug=True)
+    
+    import os
+    port = int(os.environ.get("PORT", 8050))  # use Render's PORT if available, else 8050
+    app.run(host="0.0.0.0", port=port)
+    
 
 
 def plot_trade_arrow(
