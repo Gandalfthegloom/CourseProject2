@@ -24,7 +24,7 @@ You can download the archive via your course’s MarkUs page, Send.UToronto.ca l
 
 ### 1. Clone the repository
 
-```bash
+```
 git clone https://github.com/your‑username/global‑trade‑network.git
 cd global-trade-network
 ```
@@ -33,15 +33,15 @@ cd global-trade-network
 
 Unzip `global_trade_datasets.zip` into a folder named `Data` at the project root:
 
-````bash
+```
 unzip global_trade_datasets.zip -d Data
-``` :contentReference[oaicite:2]{index=2}
+```
 
 ### 3. Install dependencies  
 This project requires Python 3.13. Install all necessary libraries via the provided script:  
-```bash
+```
 python install_packages.py
-````
+```
 
 (Or, if you prefer, `pip install -r requirements.txt`)&#x20;
 
@@ -49,11 +49,9 @@ python install_packages.py
 
 1. Launch the Dash application:
 
-   ````bash
+   ```
    python main.py
-   ``` :contentReference[oaicite:4]{index=4}
-
-   ````
+   ```
 
 2. Open your browser and navigate to
 
