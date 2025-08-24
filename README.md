@@ -1,4 +1,6 @@
-This project constructs and explores a directed, weighted network of global trade flows for 2023, applying graph‐theoretic analyses (centrality, community detection, trade‐dependency metrics) and presenting results via an interactive Dash dashboard.
+This project constructs and explores a directed, weighted network of global trade flows for 2023, applying graph‐theoretic analyses (centrality, community detection, trade‐dependency metrics) and presenting results via an interactive Dash dashboard. 
+https://wtrademap.onrender.com
+Link above!
 
 ## Overview
 
@@ -20,7 +22,34 @@ All source data is packaged in **global\_trade\_datasets.zip**, containing:
 
 You can download the archive via your course’s MarkUs page, Send.UToronto.ca link, or the provided OneDrive URL.&#x20;
 
-## Installation
+## Installation (Docker)
+
+### 1. Clone repo
+```
+git clone https://github.com/your-username/global-trade-network.git
+cd global-trade-network
+```
+
+### 2. Build the Docker image
+```
+docker build -t global-trade-app .
+```
+
+### 3. Run the container and map to local port 8050
+```
+docker run -p 8050:8050 global-trade-app
+```
+Then, click the links in the CLI!
+
+### What’s happening under the hood?
+
+The app and its dataset files are bundled into a Docker container.
+
+All dependencies (Dash, Pandas, NetworkX, etc.) are installed during build.
+
+The server is configured to run with host=0.0.0.0 and port from the PORT environment variable—making it flexible and cloud-ready.
+
+## Installation (No Docker)
 
 ### 1. Clone the repository
 
