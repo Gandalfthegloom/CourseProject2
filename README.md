@@ -1,6 +1,6 @@
 This project constructs and explores a directed, weighted network of global trade flows for 2023, applying graph‐theoretic analyses (centrality, community detection, trade‐dependency metrics) and presenting results via an interactive Dash dashboard. 
 https://wtrademap.onrender.com
-Link above!
+Link above! Disclaimer, it uses Render's free tier, so it might take a while to load and start up.
 
 ## Overview
 
